@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function roomOf(code) { return get(/databases/$(database)/documents/rooms/$(code)).data; }
+
+    match /rooms/{code} {
+      // 방 코드를 아는 로그인 사용자만 방 하나를 읽을 수 있고, 방 목록은 볼 수 없다
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.status == 'collecting'
+        && request.resource.data.roles is list
+        && request.resource.data.roles.size() <= 12
+        && request.resource.data.keys().hasOnly(['creatorUid', 'status', 'roles', 'createdAt']);
+
+      // 방장만, 모으는 중일 때만, roles만 바꿀 수 있다 (status 변경은 서버 함수만)
+      allow update: if signedIn()
+        && resource.data.creatorUid == request.auth.uid
+        && resource.data.status == 'collecting'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles'])
+        && request.resource.data.roles is list
+        && request.resource.data.roles.size() <= 12;
+
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow get, list: if signedIn();
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.nickname is string
+          && request.resource.data.nickname.size() >= 1
+          && request.resource.data.nickname.size() <= 12
+          && request.resource.data.keys().hasOnly(['nickname', 'submitted', 'joinedAt']);
+        allow update: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submitted', 'nickname'])
+          && request.resource.data.nickname.size() >= 1
+          && request.resource.data.nickname.size() <= 12;
+        allow delete: if false;
+      }
+
+      // 선호: 본인만 읽고 쓴다. 다른 팀원도, 방장도 브라우저에서는 읽을 수 없다.
+      match /prefs/{uid} {
+        allow get: if signedIn() && request.auth.uid == uid;
+        allow list: if false;
+        allow create, update: if signedIn()
+          && request.auth.uid == uid
+          && roomOf(code).status == 'collecting'
+          && request.resource.data.keys().hasOnly(['prefs', 'strength', 'wish', 'share', 'randomConsent', 'updatedAt'])
+          && request.resource.data.strength is string && request.resource.data.strength.size() <= 40
+          && request.resource.data.wish is string && request.resource.data.wish.size() <= 40
+          && request.resource.data.share is bool
+          && request.resource.data.randomConsent == true;
+        allow delete: if false;
+      }
+
+      // 공개 결과: 서버 함수만 쓴다
+      match /results/{docId} {
+        allow get: if signedIn();
+        allow list: if false;
+        allow write: if false;
+      }
+
+      // 비공개 설명: 본인만 읽는다
+      match /results_private/{uid} {
+        allow get: if signedIn() && request.auth.uid == uid;
+        allow list: if false;
+        allow write: if false;
+      }
+    }
+  }
+}

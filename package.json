@@ -1,0 +1,19 @@
+{
+  "name": "role-app",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test test/assign.test.js test/service.test.js"
+  },
+  "dependencies": {
+    "firebase": "^10.14.1",
+    "firebase-admin": "^12.7.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

@@ -34,13 +34,13 @@ export function createMemoryStore() {
     get uid() {
       return uid;
     },
-    async createRoom({ roles, nickname }) {
+    async createRoom({ roles, nickname, name }) {
       const d = read();
       let code;
       do code = Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
       while (d.rooms[code]);
       d.rooms[code] = {
-        room: { creatorUid: uid, status: 'collecting', roles },
+        room: { creatorUid: uid, status: 'collecting', roles, ...(name ? { name } : {}) },
         members: { [uid]: { nickname, submitted: false } },
         prefs: {},
         result: null,

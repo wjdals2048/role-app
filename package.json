@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/assign.test.js test/service.test.js"
+    "test": "node --test test/assign.test.js test/service.test.js test/traits.test.js test/roleGuide.test.js"
   },
   "dependencies": {
     "firebase": "^10.14.1",

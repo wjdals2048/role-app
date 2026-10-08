@@ -15,7 +15,8 @@ service cloud.firestore {
         && request.resource.data.status == 'collecting'
         && request.resource.data.roles is list
         && request.resource.data.roles.size() <= 12
-        && request.resource.data.keys().hasOnly(['creatorUid', 'status', 'roles', 'createdAt']);
+        && request.resource.data.keys().hasOnly(['creatorUid', 'status', 'roles', 'createdAt', 'name'])
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 20));
 
       // 방장만, 모으는 중일 때만, roles만 바꿀 수 있다 (status 변경은 서버 함수만)
       allow update: if signedIn()

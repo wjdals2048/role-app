@@ -91,3 +91,11 @@ test('입력 정리: 이상한 값과 긴 글을 걸러낸다', () => {
   const p = normalizePrefs({ prefs: { r1: 'hack' }, strength: 'a'.repeat(100), share: 'yes' }, [{ id: 'r1' }]);
   assert.equal(p.prefs.r1, 'ok'); assert.equal(p.strength.length, 40); assert.equal(p.share, false);
 });
+
+test('방 이름: 공백 정리·20자 제한·빈 값 허용', async () => {
+  const { normalizeRoomName } = await import('../lib/roomService.js');
+  assert.equal(normalizeRoomName('  PM캠프   3조  '), 'PM캠프 3조');
+  assert.equal(normalizeRoomName('가'.repeat(30)).length, 20);
+  assert.equal(normalizeRoomName(undefined), '');
+  assert.equal(normalizeRoomName('\u0000\n'), '');
+});

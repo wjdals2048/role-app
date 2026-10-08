@@ -50,11 +50,11 @@ export function createFirebaseStore(config) {
     get uid() {
       return uid;
     },
-    async createRoom({ roles, nickname }) {
+    async createRoom({ roles, nickname, name }) {
       for (let i = 0; i < 6; i++) {
         const code = makeCode();
         try {
-          await setDoc(doc(db, 'rooms', code), { creatorUid: uid, status: 'collecting', roles, createdAt: serverTimestamp() });
+          await setDoc(doc(db, 'rooms', code), { creatorUid: uid, status: 'collecting', roles, createdAt: serverTimestamp(), ...(name ? { name } : {}) });
           await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp() });
           return code;
         } catch (e) {

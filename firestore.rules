@@ -38,9 +38,11 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['nickname', 'submitted', 'joinedAt']);
         allow update: if signedIn()
           && request.auth.uid == uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submitted', 'nickname'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submitted', 'nickname', 'message'])
           && request.resource.data.nickname.size() >= 1
-          && request.resource.data.nickname.size() <= 12;
+          && request.resource.data.nickname.size() <= 12
+          && (!('message' in request.resource.data)
+              || (request.resource.data.message is string && request.resource.data.message.size() <= 40));
         allow delete: if false;
       }
 

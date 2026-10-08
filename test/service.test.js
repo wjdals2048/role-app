@@ -99,3 +99,24 @@ test('방 이름: 공백 정리·20자 제한·빈 값 허용', async () => {
   assert.equal(normalizeRoomName(undefined), '');
   assert.equal(normalizeRoomName('\u0000\n'), '');
 });
+
+test('닉네임 중복: 공백·대소문자를 무시하고, 본인 것은 제외한다', async () => {
+  const { isNicknameTaken, nicknameKey } = await import('../lib/roomService.js');
+  const members = [{ uid: 'a', nickname: '지은' }, { uid: 'b', nickname: 'Eun Ji' }];
+  assert.equal(isNicknameTaken(members, '지은', 'c'), true);
+  assert.equal(isNicknameTaken(members, ' 지 은 ', 'c'), true);
+  assert.equal(isNicknameTaken(members, 'eunji', 'c'), true);
+  assert.equal(isNicknameTaken(members, '민수', 'c'), false);
+  assert.equal(isNicknameTaken(members, '지은', 'a'), false); // 본인
+  assert.equal(isNicknameTaken([], '지은', 'c'), false);
+  assert.equal(isNicknameTaken(members, '   ', 'c'), false);
+  assert.equal(nicknameKey(undefined), '');
+});
+
+test('normalizeMessage: 40자 제한, 공백·제어문자 정리', async () => {
+  const { normalizeMessage, MESSAGE_MAX } = await import('../lib/roomService.js');
+  assert.equal(MESSAGE_MAX, 40);
+  assert.equal(normalizeMessage('  최선을  다할게요\n'), '최선을 다할게요');
+  assert.equal(normalizeMessage('가'.repeat(60)).length, 40);
+  assert.equal(normalizeMessage(undefined), '');
+});

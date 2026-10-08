@@ -1,6 +1,6 @@
 import './style.css';
 import { createStore } from './store.js';
-import { normalizePrefs, normalizeRoles, normalizeRoomName, LOAD_LABEL } from '../lib/roomService.js';
+import { normalizePrefs, normalizeRoles, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, LOAD_LABEL } from '../lib/roomService.js';
 import { relevantTraits, suggestPrefs } from '../lib/traits.js';
 import { KINDS, PHASES, DESC_MAX, STEP_COUNT, kindFromName, templateFor } from '../lib/roleGuide.js';
 
@@ -194,10 +194,11 @@ function roomShell(code) {
     <div id="s-roles"></div>
     <div id="s-prefs"></div>
     <div id="s-members"></div>
+    <div id="s-mine"></div>
     <div id="s-result"></div>
     <div id="s-duties"></div>`;
   $app.querySelector('#back').addEventListener('click', () => {
-    const inStep = S && me() && ((S.view === 'card' && assigned()) || ((S.view === 'roles' || S.view === 'prefs') && !assigned()));
+    const inStep = S && me() && (((S.view === 'card' || S.view === 'team') && assigned()) || ((S.view === 'roles' || S.view === 'prefs') && !assigned()));
     location.hash = inStep ? `#/room/${code}` : '#/';
   });
   const link = `${location.origin}${location.pathname}#/room/${code}`;
@@ -263,6 +264,7 @@ function renderAll() {
   renderRoles();
   renderPrefs();
   renderMembers();
+  renderMine();
   renderResult();
   renderDuties();
   applyView();
@@ -276,16 +278,30 @@ function applyView() {
   const done = assigned();
   const step = joined && !done && (S.view === 'roles' || S.view === 'prefs') ? S.view : null;
   const onCard = joined && done && S.view === 'card';
-  show('#room-card', !step && !onCard);
+  const onTeam = done && (!joined || S.view === 'team'); // 방에 아직 안 들어온 사람도 결과는 팀 화면으로 본다
+  const onMine = joined && done && !onCard && !onTeam;
+  show('#room-card', !step && !onCard && !onMine);
   show('#s-join', !joined);
   show('#s-hub', joined && !done && !step);
   show('#s-members', joined && !done && !step);
   show('#s-roles', !joined || step === 'roles');
   show('#s-prefs', step === 'prefs');
-  show('#s-result', done && !onCard);
+  show('#s-mine', onMine);
+  show('#s-result', onTeam);
   show('#s-duties', onCard);
   const back = $app.querySelector('#back');
-  if (back) back.textContent = onCard ? '← 결과로' : step ? '← 방으로' : '← 처음으로';
+  if (back) back.textContent = onCard || (onTeam && joined) ? '← 내 결과로' : step ? '← 방으로' : '← 처음으로';
+}
+
+/** 방장에게만: 역할 자리 수와 참여 인원을 비교해 안내한다. */
+function slotGuide(roles) {
+  if (!isCreator()) return '';
+  const people = S.members.length;
+  const slots = roles.reduce((s, r) => s + Math.min(r.need || 1, Math.max(people, 1)), 0);
+  if (!people || !slots) return '';
+  if (slots > people) return `<p class="muted small">역할 자리는 ${esc(slots)}개, 참여는 ${esc(people)}명이에요. 일부 팀원이 역할을 2개 이상 맡을 수 있어요.</p>`;
+  if (slots < people) return `<p class="muted small">역할 자리(${esc(slots)}개)보다 참여 인원(${esc(people)}명)이 많아서, 역할을 못 받는 팀원이 생길 수 있어요.</p>`;
+  return '';
 }
 
 /** 허브: 내가 지금 할 일을 단계별로 보여 준다. */
@@ -305,6 +321,7 @@ function renderHub() {
         <span class="task-body"><b>2. 내 선호 입력</b><span class="muted small">${submitted ? '저장했어요. 배정 전까지 바꿀 수 있어요.' : '하고 싶은 역할과 하기 싫은 역할을 골라요. 다른 팀원에게는 보이지 않아요.'}</span></span>
         <span class="tag ${submitted ? 'ok' : ''}">${submitted ? '완료 ✓' : '입력하기'}</span>
       </button>
+      ${slotGuide(roles)}
     </section>`;
 }
 
@@ -325,7 +342,7 @@ function renderJoin() {
   if (el.querySelector('#join-nick')) return; // 입력 중이면 다시 그리지 않음
   el.innerHTML = `
     <section class="card stack">
-      <div><h2>닉네임을 정하고 들어가요</h2><p class="muted">다른 팀원에게는 이 이름으로 보여요. 이름·이메일은 받지 않아요.</p></div>
+      <div><h2>닉네임을 정하고 들어가요</h2><p class="muted">다른 팀원에게는 이 이름으로 보여요. 이름·이메일은 받지 않아요.</p><p class="muted small" style="margin-top:6px">🔒 내가 고른 선호는 다른 팀원에게 공개되지 않아요.</p></div>
       <input id="join-nick" type="text" maxlength="12" placeholder="예: 지은" value="${esc(savedNick())}" aria-label="닉네임" autocomplete="off" />
       ${assigned() ? '<p class="notice">이미 배정이 끝난 방이에요. 지금 들어가도 이번 배정에는 포함되지 않아요.</p>' : ''}
       <button type="button" class="btn" id="do-join">들어가기</button>
@@ -469,9 +486,6 @@ async function renderPrefs() {
       S.form = blankForm();
       if (saved) {
         S.form.prefs = { ...S.form.prefs, ...saved.prefs };
-        S.form.strength = saved.strength || '';
-        S.form.wish = saved.wish || '';
-        S.form.share = saved.share === true;
         S.form.randomConsent = saved.randomConsent === true;
         S.form.saved = true;
         S.touched = new Set(Object.keys(saved.prefs || {})); // 저장된 선택은 본인이 확정한 것
@@ -521,16 +535,6 @@ async function renderPrefs() {
           .join('')}
       </div>
 
-      <div class="stack">
-        <div><h3>나를 소개하는 두 줄 <span class="tag">선택</span></h3><p class="muted small">공개에 동의하면 배정 결과에서 팀원에게 소개 문장으로 보여요.</p></div>
-        <div><label for="strength">잘하는 것 한 줄</label><input id="strength" type="text" maxlength="40" placeholder="예: 자료를 깔끔하게 정리해요" value="${esc(f.strength)}" /></div>
-        <div><label for="wish">이번에 해 보고 싶은 것 한 줄</label><input id="wish" type="text" maxlength="40" placeholder="예: 발표를 처음 해 보고 싶어요" value="${esc(f.wish)}" /></div>
-        <div class="check warn">
-          <input type="checkbox" id="share" ${f.share ? 'checked' : ''} />
-          <label for="share">위 두 줄을 <b>팀원에게 공개</b>하고, 소개 문장을 만드는 데 <b>AI(외부 서비스)</b>가 쓰이는 것에 동의해요. 체크하지 않으면 입력해도 팀원에게 보이지 않고 AI에도 전달되지 않아요. (하고 싶다/하기 싫다 선택은 어느 경우에도 AI에 전달되지 않아요.)</label>
-        </div>
-      </div>
-
       <div class="check">
         <input type="checkbox" id="random" ${f.randomConsent ? 'checked' : ''} />
         <label for="random"><b>(필수)</b> 하기 싫은 배정을 피할 수 없거나 조건이 같을 때, 무작위로 정해지는 것에 동의해요.</label>
@@ -543,28 +547,42 @@ async function renderPrefs() {
 
 function renderMembers() {
   const el = $app.querySelector('#s-members');
+  const total = S.members.length;
   const submitted = S.members.filter((m) => m.submitted).length;
-  const missing = S.members.length - submitted;
+  const missing = total - submitted;
   const creator = isCreator();
+  let action = '';
+  if (creator && !assigned()) {
+    if (S.busy) {
+      action = '<button type="button" class="btn" id="do-assign" disabled><span class="spinner"></span>배정하는 중…</button>';
+    } else if (missing === 0) {
+      action = '<button type="button" class="btn" id="do-assign" ' + (submitted === 0 ? 'disabled' : '') + '>배정하기</button>';
+    } else if (S.confirmAssign) {
+      action = `<div class="stack">
+          <p class="notice">미제출 ${esc(missing)}명은 선호가 없는 상태로 처리돼요(모든 역할을 "상관없다"로 봐요). 그 팀원이 원하지 않는 역할에 배정될 수 있어요.</p>
+          <button type="button" class="btn" id="do-assign">미제출 ${esc(missing)}명 포함해서 배정하기</button>
+          <button type="button" class="btn line" id="cancel-assign">선호 제출을 기다리기</button>
+        </div>`;
+    } else {
+      action = `<div class="stack">
+          <p class="notice">아직 선호를 제출하지 않은 팀원이 ${esc(missing)}명 있어요. 모든 팀원이 제출하면 배정할 수 있어요.</p>
+          <button type="button" class="btn" id="do-assign" disabled>모두 제출하면 배정할 수 있어요 (${esc(submitted)}/${esc(total)})</button>
+          ${submitted > 0 ? '<button type="button" class="link" id="force-assign" style="align-self:center">그래도 배정하기</button>' : '<p class="muted small">한 명 이상 선호를 저장하면 배정할 수 있어요.</p>'}
+        </div>`;
+    }
+  }
   el.innerHTML = `
     <section class="card stack">
-      <div><h2>참여 현황</h2><p class="muted">선호를 낸 사람은 초록색이에요. (무엇을 골랐는지는 보이지 않아요.)</p></div>
+      <div>
+        <div class="row between"><h2>참여 현황</h2><span class="muted small">${esc(submitted)}/${esc(total)}명 제출</span></div>
+        <p class="muted">선호를 낸 사람은 초록색이에요. (무엇을 골랐는지는 보이지 않아요.)</p>
+      </div>
       <div class="members">
         ${S.members
           .map((m) => `<span class="member ${m.submitted ? 'done' : ''} ${m.uid === store.uid ? 'me' : ''}">${esc(m.nickname)}${m.uid === store.uid ? ' (나)' : ''}${m.submitted ? ' ✓' : ''}</span>`)
           .join('')}
       </div>
-      ${
-        creator && !assigned()
-          ? `<div class="stack">
-              ${missing > 0 && submitted > 0 ? `<p class="notice">아직 선호를 내지 않은 팀원이 ${missing}명 있어요. 그대로 배정하면 그 팀원은 모든 역할을 "상관없다"로 처리해요.</p>` : ''}
-              ${submitted === 0 ? '<p class="muted small">한 명 이상 선호를 저장하면 배정할 수 있어요.</p>' : ''}
-              <button type="button" class="btn" id="do-assign" ${S.busy || submitted === 0 ? 'disabled' : ''}>${
-                S.busy ? '<span class="spinner"></span>배정하는 중…' : missing > 0 && S.confirmAssign ? `미제출 ${missing}명 포함해서 배정하기` : '배정하기'
-              }</button>
-            </div>`
-          : ''
-      }
+      ${action}
       ${!creator && !assigned() ? '<p class="muted small">방장이 배정 버튼을 누르면 결과가 나와요.</p>' : ''}
     </section>`;
 }
@@ -606,15 +624,6 @@ function dutyCardsHtml(r) {
     </section>`;
 }
 
-/** 결과 화면의 "내 역할 카드 보기" 버튼. 맡은 역할이 없으면 안내만. */
-function cardButtonHtml(r) {
-  const duties = myDuties(r);
-  if (!duties.length) {
-    return me() && S.priv ? '<p class="notice">이번에는 배정된 역할이 없어요. 팀에서 보조 역할을 함께 정해 보세요.</p>' : '';
-  }
-  return `<button type="button" class="btn big" id="go-card">내 역할 카드 보기 (${esc(duties.map((d) => d.name).join(', '))})</button>`;
-}
-
 /** 내 역할 카드 화면 */
 function renderDuties() {
   const el = $app.querySelector('#s-duties');
@@ -623,56 +632,85 @@ function renderDuties() {
   el.innerHTML = html || '<section class="card"><h2>내 역할 카드</h2><p class="muted" style="margin-top:6px">이번에는 배정된 역할이 없어요.</p></section>';
 }
 
+const msgOf = (uid) => normalizeMessage(S.members.find((m) => m.uid === uid)?.message);
+
+/** 내 결과 화면: 내 역할 · 배정 이유 · 한마디 */
+function renderMine() {
+  const el = $app.querySelector('#s-mine');
+  const r = S.result;
+  if (!me() || !assigned() || !r) { el.innerHTML = ''; S.mineSig = ''; return; }
+  const duties = myDuties(r);
+  const sig = JSON.stringify([r.round, duties.map((d) => d.name), S.priv?.lines || [], msgOf(store.uid)]);
+  if (sig === S.mineSig) return; // 입력 중인 글이 지워지지 않게, 바뀐 게 없으면 다시 그리지 않는다
+  S.mineSig = sig;
+  el.innerHTML = `
+    <section class="card stack">
+      <div class="row between"><h2>내 결과</h2><span class="badge done">${esc(r.round || 1)}차 배정</span></div>
+      ${
+        !S.priv
+          ? '<p class="muted"><span class="spinner"></span>내 결과를 불러오는 중…</p>'
+          : duties.length
+          ? duties.map((d) => `<div><p class="muted small">이번에 내가 맡은 역할</p><p class="my-role-name">${esc(d.name)}</p>${d.desc ? `<p class="muted">${esc(d.desc)}</p>` : ''}</div>`).join('')
+          : '<p class="notice">이번에는 배정된 역할이 없어요. 팀에서 보조 역할을 함께 정해 보세요.</p>'
+      }
+    </section>
+    ${
+      S.priv
+        ? `<section class="card"><h2>나의 배정 이유 <span class="badge">나에게만 보여요</span></h2><ul class="lines">${(S.priv.lines || []).map((l) => `<li>${esc(l)}</li>`).join('')}</ul></section>`
+        : ''
+    }
+    ${duties.length ? `<button type="button" class="btn big" id="go-card">내 역할 카드 보기 (${esc(duties.map((d) => d.name).join(', '))})</button>` : ''}
+    <section class="card stack">
+      <div><h2>팀원들에게 한마디 <span class="tag">선택</span></h2><p class="muted small">남기면 팀 전체 결과에서 내 이름 아래에 작게 보여요. 배정 전까지의 선호와는 관계없어요.</p></div>
+      <input id="msg" type="text" maxlength="${MESSAGE_MAX}" placeholder="예: 부족한 점이 많지만 최선을 다하겠습니다" value="${esc(msgOf(store.uid))}" />
+      <button type="button" class="btn line" id="save-msg">한마디 남기기</button>
+    </section>
+    <button type="button" class="btn big" id="go-team">팀 전체 결과 보기</button>`;
+}
+
+function resultCopyText() {
+  const r = S.result;
+  const lines = [`📌 ${S.room?.name || '팀 역할'}${r.round > 1 ? ` (${r.round}차 배정)` : ''}`];
+  for (const role of r.roles) lines.push(`${role.name} — ${role.members.length ? role.members.map((m) => m.nickname).join(', ') : '(미배정)'}`);
+  if (r.unassigned?.length) lines.push(`역할 없음 — ${r.unassigned.map((u) => u.nickname).join(', ')}`);
+  return lines.join('\n');
+}
+
+/** 팀 전체 결과 화면 */
 function renderResult() {
   const el = $app.querySelector('#s-result');
   const r = S.result;
   if (!assigned() || !r) { el.innerHTML = ''; return; }
   const myId = store.uid;
   const s = r.summary || {};
-  const introEntries = Object.entries(r.lines || {});
-  const aiNote = r.aiUsed
-    ? '<p class="muted small" style="margin-top:8px">AI가 쓴 문장에는 표시가 붙어 있어요. 팀원이 직접 쓴 두 줄만 재료로 썼어요.</p>'
-    : r.aiError && r.aiError !== 'no_key'
-      ? '<p class="muted small" style="margin-top:8px">AI 문장을 만들지 못해 기본 문장으로 보여드려요.</p>'
-      : '';
+  const person = (m) => {
+    const msg = msgOf(m.uid);
+    return `<span class="person"><span class="member ${m.uid === myId ? 'me' : ''}">${esc(m.nickname)}${m.uid === myId ? ' (나)' : ''}</span>${msg ? `<small class="msg">${esc(msg)}</small>` : ''}</span>`;
+  };
   el.innerHTML = `
     <section class="card stack">
-      <div class="row between"><h2>배정 결과</h2><span class="badge done">${esc(r.round || 1)}차 배정</span></div>
-      ${s.conflictCount > 0 ? `<p class="notice bad">"하기 싫다"로 표시한 배정이 ${esc(s.conflictCount)}건 남았어요. 가장 적게 만든 조합인데도 불가피했어요. 누구인지는 공개하지 않으니, 팀에서 역할을 한 번 같이 이야기해 보세요.</p>` : '<p class="notice info">"하기 싫다"로 표시한 배정은 없어요.</p>'}
-      ${s.randomCount > 0 ? `<p class="notice">조건이 같은 조합이 여러 개여서 무작위로 정해진 배정이 ${esc(s.randomCount)}건 있어요.</p>` : ''}
+      <div class="row between"><h2>팀 전체 결과</h2><span class="badge done">${esc(r.round || 1)}차 배정</span></div>
+      ${s.conflictCount > 0 ? `<p class="notice bad">"하기 싫다"로 표시한 배정이 ${esc(s.conflictCount)}건 남았어요. 가장 적게 만든 조합인데도 불가피했어요. 누구인지는 공개하지 않으니, 팀에서 역할을 한 번 같이 이야기해 보세요.</p>` : ''}
       <div>
         ${r.roles
           .map(
             (role) => `
           <div class="role-card">
             <div><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span><span class="tag">부담 ${esc(LOAD_LABEL[role.load])}</span></div>
-            <div class="names">${role.members.length ? role.members.map((m) => `<span class="member ${m.uid === myId ? 'me' : ''}">${esc(m.nickname)}${m.uid === myId ? ' (나)' : ''}</span>`).join('') : '<span class="muted small">배정된 사람이 없어요</span>'}</div>
+            <div class="names">${role.members.length ? role.members.map(person).join('') : '<span class="muted small">배정된 사람이 없어요</span>'}</div>
           </div>`,
           )
           .join('')}
       </div>
-      ${r.unassigned?.length ? `<p class="notice">이번에 역할이 배정되지 않은 팀원: <b>${r.unassigned.map((u) => esc(u.nickname)).join(', ')}</b>. 팀에서 보조 역할을 함께 정해 보세요.</p>` : ''}
+      ${r.unassigned?.length ? `<div class="notice">이번에 역할이 배정되지 않은 팀원: <div class="names" style="margin-top:6px">${r.unassigned.map(person).join('')}</div><p class="small" style="margin-top:6px">팀에서 보조 역할을 함께 정해 보세요.</p></div>` : ''}
+      <button type="button" class="btn line" id="copy-result">결과 복사하기</button>
+      <p class="muted small">복사에는 역할과 이름만 담겨요. 배정 이유와 선호는 포함되지 않아요.</p>
     </section>
-
-    ${
-      S.priv
-        ? `<section class="card"><h2>나의 배정 이유 <span class="badge">나에게만 보여요</span></h2><ul class="lines">${(S.priv.lines || []).map((l) => `<li>${esc(l)}</li>`).join('')}</ul></section>`
-        : ''
-    }
-
-    ${cardButtonHtml(r)}
-
-    ${
-      introEntries.length
-        ? `<section class="card"><h2>팀원 소개</h2><p class="muted small" style="margin-top:4px">공개에 동의한 팀원만 나와요.</p><div style="margin-top:10px">${introEntries
-            .map(([, l]) => `<div class="intro">${l.ai ? '<span class="ai-tag">AI</span>' : ''}${esc(l.text)}</div>`)
-            .join('')}</div>${aiNote}</section>`
-        : ''
-    }
 
     <section class="card">
       <details><summary style="cursor:pointer;font-weight:700">이 배정은 이런 규칙으로 정해졌어요</summary>
         <ol class="lines" style="padding-left:20px">${(s.notes || []).map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
+        ${s.randomCount > 0 ? `<p class="muted small" style="margin-top:8px">이번 결과에서는 선호와 부담도가 같은 조합이 여러 개여서, 마지막 단계(무작위)로 정해진 배정이 ${esc(s.randomCount)}건 있어요.</p>` : ''}
         <p class="muted small" style="margin-top:8px">배정 계산에는 AI를 쓰지 않아요. 같은 입력이면 같은 규칙이 적용돼요.</p>
       </details>
     </section>
@@ -687,6 +725,7 @@ function attachDelegates() {
     if (!e.target.closest('#do-join')) return;
     const nickname = q('#join-nick').value.replace(/\s+/g, ' ').trim().slice(0, 12);
     if (!nickname) return toast('닉네임을 입력해 주세요.');
+    if (isNicknameTaken(S.members, nickname, store.uid)) return toast('이미 쓰고 있는 닉네임이에요. 다른 이름을 입력해 주세요.');
     e.target.closest('button').disabled = true;
     try {
       saveNick(nickname);
@@ -753,6 +792,10 @@ function attachDelegates() {
     if (e.target.closest('#r-save')) {
       const clean = draftToRoles(S.rolesDraft);
       if (!clean.length) return toast('역할을 하나 이상 남겨 주세요.');
+      const sig = (list) => JSON.stringify((list || []).map((r) => [r.id, r.name, r.need, r.load]));
+      if (S.members.some((m) => m.submitted) && sig(clean) !== sig(S.room.roles)) {
+        if (!window.confirm('이미 선호를 제출한 팀원이 있어요. 새로 추가한 역할은 그 팀원에게 "상관없다"로 처리돼요. 저장할까요?')) return;
+      }
       e.target.closest('button').disabled = true;
       try {
         await store.updateRoles(S.code, clean);
@@ -775,13 +818,7 @@ function attachDelegates() {
       S.touched.add(e.target.dataset.rid); // 직접 고른 선택은 성향 제안이 덮어쓰지 않는다
       applyTraits();
     }
-    if (e.target.id === 'share') S.form.share = e.target.checked;
     if (e.target.id === 'random') S.form.randomConsent = e.target.checked;
-  });
-  prefsEl.addEventListener('input', (e) => {
-    if (!S.form) return;
-    if (e.target.id === 'strength') S.form.strength = e.target.value;
-    if (e.target.id === 'wish') S.form.wish = e.target.value;
   });
   prefsEl.addEventListener('click', async (e) => {
     const chip = e.target.closest('.trait');
@@ -795,10 +832,7 @@ function attachDelegates() {
     if (!e.target.closest('#save-prefs')) return;
     const f = S.form;
     if (!f.randomConsent) return toast('무작위 배정 동의(필수)에 체크해 주세요.');
-    if (!f.share && (f.strength.trim() || f.wish.trim())) {
-      toast('두 줄은 "공개 동의"를 체크해야 팀원에게 보여요. 지금은 저장만 되고 공개되지 않아요.');
-    }
-    const data = normalizePrefs(f, S.room.roles);
+    const data = { ...normalizePrefs(f, S.room.roles), strength: '', wish: '', share: false }; // 소개 두 줄은 더 이상 받지 않는다 (규칙상 필드는 유지)
     e.target.closest('button').disabled = true;
     try {
       await store.savePrefs(S.code, data);
@@ -807,7 +841,7 @@ function attachDelegates() {
       S.traits = new Set();
       S.prefsSig = '';
       renderPrefs();
-      if (f.share || !(f.strength.trim() || f.wish.trim())) toast('선호를 저장했어요.');
+      toast('선호를 저장했어요.');
       location.hash = `#/room/${S.code}`;
     } catch (err) {
       console.error(err);
@@ -822,12 +856,11 @@ function attachDelegates() {
     if (b) location.hash = `#/room/${S.code}/${b.dataset.go}`;
   });
   q('#s-members').addEventListener('click', async (e) => {
+    if (e.target.closest('#force-assign')) { S.confirmAssign = true; renderMembers(); return; }
+    if (e.target.closest('#cancel-assign')) { S.confirmAssign = false; renderMembers(); return; }
     if (!e.target.closest('#do-assign') || S.busy) return;
     const missing = S.members.filter((m) => !m.submitted).length;
-    if (missing > 0 && !S.confirmAssign) {
-      S.confirmAssign = true;
-      return renderMembers();
-    }
+    if (missing > 0 && !S.confirmAssign) return; // 미제출자가 있으면 "그래도 배정하기"를 거쳐야 한다
     S.busy = true;
     renderMembers();
     try {
@@ -840,9 +873,32 @@ function attachDelegates() {
     S.confirmAssign = false;
     renderAll();
   });
-  q('#s-result').addEventListener('click', async (e) => {
+  q('#s-mine').addEventListener('click', async (e) => {
     if (e.target.closest('#go-card')) { location.hash = `#/room/${S.code}/card`; return; }
+    if (e.target.closest('#go-team')) { location.hash = `#/room/${S.code}/team`; return; }
+    if (e.target.closest('#save-msg')) {
+      const v = normalizeMessage(q('#msg').value);
+      const b = e.target.closest('button');
+      b.disabled = true;
+      try {
+        await store.setMessage(S.code, v);
+        toast(v ? '한마디를 남겼어요. 팀 전체 결과에서 내 이름 아래에 보여요.' : '한마디를 지웠어요.');
+      } catch (err) {
+        console.error(err);
+        toast(`저장하지 못했어요: ${err.message}`);
+      }
+      b.disabled = false;
+    }
+  });
+  q('#s-result').addEventListener('click', async (e) => {
+    if (e.target.closest('#copy-result')) {
+      const text = resultCopyText();
+      try { await navigator.clipboard.writeText(text); toast('결과를 복사했어요.'); }
+      catch { toast('복사하지 못했어요. 화면을 캡처해 공유해 주세요.'); }
+      return;
+    }
     if (!e.target.closest('#do-reopen')) return;
+    if (!window.confirm('선호를 수정하고 다시 배정하면 이전 결과는 새 결과로 바뀌어요. 계속할까요?')) return;
     e.target.closest('button').disabled = true;
     try {
       await store.reopen(S.code);
@@ -860,7 +916,7 @@ function attachDelegates() {
 
 /* ---------------- 라우터 ---------------- */
 async function route() {
-  const m = location.hash.match(/^#\/room\/([A-Za-z0-9]{6})(?:\/(roles|prefs|card))?$/);
+  const m = location.hash.match(/^#\/room\/([A-Za-z0-9]{6})(?:\/(roles|prefs|card|team))?$/);
   if (m) {
     const code = m[1].toUpperCase();
     const view = m[2] || 'hub';

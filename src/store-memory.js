@@ -76,6 +76,11 @@ export function createMemoryStore() {
       d.rooms[code].members[uid].submitted = true;
       write(d);
     },
+    async setMessage(code, message) {
+      const d = read();
+      d.rooms[code].members[uid].message = message;
+      write(d);
+    },
     async assign(code) {
       const d = read();
       const r = d.rooms[code];

@@ -87,6 +87,9 @@ export function createFirebaseStore(config) {
       await setDoc(doc(db, 'rooms', code, 'prefs', uid), { ...data, updatedAt: serverTimestamp() });
       await updateDoc(doc(db, 'rooms', code, 'members', uid), { submitted: true });
     },
+    async setMessage(code, message) {
+      await updateDoc(doc(db, 'rooms', code, 'members', uid), { message });
+    },
     assign: (code) => call('assign', code),
     reopen: (code) => call('reopen', code),
   };

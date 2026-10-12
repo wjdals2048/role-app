@@ -373,3 +373,41 @@ body.is-start::after { content: ''; position: fixed; right: -120px; top: 56%; wi
 .sc-ic img { height: 60px; max-width: 66px; }
 .recent { background: #fff; border-radius: 22px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(122,107,224,.10); }
 .recent h2 { font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+
+/* ---- 전체 화면: 와이어프레임 톤 (둥근 카드 · 알약 버튼 · 배경 원) ---- */
+body:not(.is-start) { background: #FAF9FF; position: relative; overflow-x: hidden; }
+body:not(.is-start)::before { content: ''; position: fixed; top: -330px; left: 50%; width: 560px; height: 560px; margin-left: -280px; border-radius: 50%; background: #DDE1FF; z-index: -1; }
+body:not(.is-start)::after { content: ''; position: fixed; right: -60px; top: 58%; width: 150px; height: 150px; border-radius: 50%; background: #FFF0C2; z-index: -1; }
+.card { border: 0; border-radius: 28px; box-shadow: 0 10px 30px rgba(60,70,160,.10); }
+.btn.big { border-radius: 999px; padding: 18px 16px; }
+.btn.line { box-shadow: 0 0 0 1.5px #DADFF7; border: 0; }
+.btn.accent { background: #BFC8FF; }
+.badge { background: #E4E8FF; color: #3C49B8; border-radius: 8px; padding: 2px 8px; }
+.badge.done { background: #E4E8FF; color: #3C49B8; }
+#go-team { background: #BDEFDD; color: var(--ink); }
+
+/* 내 결과 */
+.mine-top { text-align: center; padding: 10px 0 2px; }
+.my-hero { display: flex; flex-direction: column; align-items: center; margin-top: 12px; }
+.my-hero .tile.l { box-shadow: 0 8px 20px rgba(60,70,160,.14); }
+.my-role-name { font-size: 34px; margin: 4px 0; }
+.mine-top + .card { margin-top: 18px; }
+
+/* 팀 결과 */
+.role-card.rc-col { border: 0; border-radius: 24px; padding: 14px 16px 16px; margin-top: 12px; }
+.rc-name { display: inline-flex; align-items: center; gap: 10px; font-size: 17px; }
+.role-card.rc-col .role-link { background: #fff; color: var(--brand); box-shadow: 0 2px 8px rgba(60,70,160,.12); }
+.role-card.rc-col .names { gap: 10px; flex-direction: column; margin-top: 12px; }
+.role-card.rc-col .names .member, .role-card.rc-col .names .member.me { display: inline-flex; align-items: center; gap: 10px; background: transparent; color: var(--ink); padding: 0; outline: 0; font-size: 16px; }
+.member .av { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; box-shadow: 0 0 0 2px #fff; }
+.me-tag { font-size: 12px; background: #1F2340; color: #fff; border-radius: 8px; padding: 1px 7px; }
+.role-card.rc-col .msg { margin: 4px 0 0 44px; background: #fff; border-radius: 12px; padding: 5px 10px; display: inline-block; font-size: 12px; }
+.role-card.rc-col .person { display: flex; flex-direction: column; align-items: flex-start; }
+.role-card.rc-col .tag { background: rgba(255,255,255,.7); }
+
+/* 역할 카드 */
+.duty { border: 0; border-radius: 28px; box-shadow: 0 10px 30px rgba(60,70,160,.12); }
+.duty-head { background: #DDE1FF; color: var(--ink); text-align: center; padding: 22px 18px 18px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.duty-head .tile.l { width: 84px; height: 84px; border-radius: 30px; box-shadow: 0 8px 20px rgba(60,70,160,.14); }
+.duty-head h3 { font-size: 28px; }
+.duty-head p { opacity: 1; color: #4B5170; }

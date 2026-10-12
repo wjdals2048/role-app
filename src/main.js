@@ -347,6 +347,8 @@ function roomShell(code) {
 
 const me = () => S.members.find((m) => m.uid === store.uid);
 const isCreator = () => S.room && S.room.creatorUid === store.uid;
+/** 역할 카드(설명·할 일)는 방에 들어온 팀원이면 누구나 고칠 수 있다 */
+const canEditGuide = () => isCreator() || !!me();
 const assigned = () => S.room?.status === 'assigned';
 
 async function openRoom(code, view = 'hub') {
@@ -689,7 +691,7 @@ function dutySheetHtml(r, i) {
     <div class="sheet" role="dialog" aria-label="${esc(r.name)} 할 일">
       <div class="grab"></div>
       <div class="sheet-head"><div class="tile" style="background:${TILE_BG[i % 4]};width:40px;height:40px;border-radius:14px">${roleIcon(r, 24)}</div><h2>할 일</h2><button type="button" class="sheet-x" data-act="close" aria-label="닫기">✕</button></div>
-      <p class="muted">방장이 적어 둔 내용이에요</p>
+      <p class="muted">팀에서 적어 둔 내용이에요</p>
       ${tasks.length ? `<div class="sheet-ph" style="background:${PHASE_BG[0]}">${tasks.map((t) => `<div class="li"><span>•</span><span>${esc(t)}</span></div>`).join('')}</div>` : '<div class="sheet-ph" style="background:#E4E8FF">아직 적지 않았어요</div>'}
       <button type="button" class="btn big" data-act="close">확인했어요</button>
     </div>`;
@@ -830,6 +832,7 @@ function dutyBodyHtml(role) {
   return `
     <article class="duty">
       <header class="duty-head">
+        <span class="tile l" style="background:#fff">${roleIcon(role, 48)}</span>
         <h3>${esc(role.name)}</h3>
         ${d.desc ? `<p>${esc(d.desc)}</p>` : ''}
       </header>
@@ -840,7 +843,7 @@ function dutyBodyHtml(role) {
             ${shown}
             ${multi ? `<p class="muted small">${canTag ? '태그를 누르면 담당을 정할 수 있어요. ' : ''}담당은 같은 역할의 팀원 모두에게 보여요.</p>` : ''}
             ${isMine ? '<p class="muted small">체크는 이 브라우저에만 저장돼요. 다른 팀원에게는 보이지 않아요.</p>' : ''}</div>`
-          : '<p class="duty-empty">아직 이 역할의 할 일을 적지 않았어요.' + (isCreator() ? ' 아래 "수정하기"로 적어 주세요.' : ' 방장이 적으면 여기에 보여요.') + '</p>'
+          : '<p class="duty-empty">아직 이 역할의 할 일을 적지 않았어요.' + (canEditGuide() ? ' 아래 "수정하기"로 적어 주세요.' : ' 팀원이 적으면 여기에 보여요.') + '</p>'
       }
     </article>`;
 }
@@ -880,9 +883,9 @@ function renderDuties() {
       <h2 id="h-duties">${mine.has(sel.id) ? '내 역할 카드' : '역할 카드'}</h2>
       <div class="rc-chips" role="tablist">${roles.map((r) => `<button type="button" role="tab" aria-selected="${r.id === sel.id}" class="rc-chip${r.id === sel.id ? ' on' : ''}" data-role="${esc(r.id)}">${esc(r.name)}${mine.has(r.id) ? ' <small>내 역할</small>' : ''}</button>`).join('')}</div>
       <p class="muted small rc-who">맡은 사람: ${names || '아직 없어요'}</p>
-      ${S.editGuide && isCreator() ? guideFormHtml(sel) : dutyBodyHtml(sel)}
-      ${S.editGuide && isCreator() ? '' : '<button type="button" class="btn big line" id="gd-copy" style="margin-top:12px">이 역할 카드 복사하기</button>'}
-      ${isCreator() && !S.editGuide ? '<button type="button" class="btn big line" id="gd-edit" style="margin-top:12px">이 역할 설명·할 일 수정하기</button>' : ''}
+      ${S.editGuide && canEditGuide() ? guideFormHtml(sel) : dutyBodyHtml(sel)}
+      ${S.editGuide && canEditGuide() ? '' : '<button type="button" class="btn big line" id="gd-copy" style="margin-top:12px">이 역할 카드 복사하기</button>'}
+      ${canEditGuide() && !S.editGuide ? '<button type="button" class="btn big line" id="gd-edit" style="margin-top:12px">이 역할 설명·할 일 수정하기</button>' : ''}
     </section>
     <button type="button" class="btn big" id="back-card" style="margin-top:16px">돌아가기</button>`;
 }
@@ -899,13 +902,13 @@ function renderMine() {
   if (sig === S.mineSig) return; // 입력 중인 글이 지워지지 않게, 바뀐 게 없으면 다시 그리지 않는다
   S.mineSig = sig;
   el.innerHTML = `
-    <section class="card stack">
-      <div class="row between"><h2>내 결과</h2><span class="badge done">${esc(r.round || 1)}차 배정</span></div>
+    <section class="mine-top">
+      <span class="badge">${esc(r.round || 1)}차 배정</span>
       ${
         !S.priv
           ? '<p class="muted"><span class="spinner"></span>내 결과를 불러오는 중…</p>'
           : duties.length
-          ? duties.map((d) => `<div><p class="muted small">이번에 내가 맡은 역할</p><p class="my-role-name">${esc(d.name)}</p>${d.desc ? `<p class="muted">${esc(d.desc)}</p>` : ''}</div>`).join('')
+          ? duties.map((d) => `<div class="my-hero"><div class="tile l" style="width:96px;height:96px;border-radius:33px;background:#fff">${roleIcon(d, 52)}</div><p class="muted small" style="margin-top:14px">이번에 내가 맡은 역할</p><p class="my-role-name">${esc(d.name)}</p>${d.desc ? `<p class="muted">${esc(d.desc)}</p>` : ''}</div>`).join('')
           : '<p class="notice">이번에는 배정된 역할이 없어요. 팀에서 보조 역할을 함께 정해 보세요.</p>'
       }
     </section>
@@ -958,7 +961,8 @@ function renderResult() {
   const s = r.summary || {};
   const person = (m) => {
     const msg = msgOf(m.uid);
-    return `<span class="person"><span class="member ${m.uid === myId ? 'me' : ''}">${esc(m.nickname)}${m.uid === myId ? ' (나)' : ''}</span>${msg ? `<small class="msg">${esc(msg)}</small>` : ''}</span>`;
+    const ci = Math.max(0, S.members.findIndex((x) => x.uid === m.uid));
+    return `<span class="person"><span class="member ${m.uid === myId ? 'me' : ''}"><span class="av" style="background:${OWN_COLORS[ci % OWN_COLORS.length]}">${esc([...m.nickname][0] || '')}</span>${esc(m.nickname)}${m.uid === myId ? ' <span class="me-tag">나</span>' : ''}</span>${msg ? `<small class="msg">${esc(msg)}</small>` : ''}</span>`;
   };
   el.innerHTML = `
     <section class="card stack">
@@ -966,9 +970,9 @@ function renderResult() {
       <div>
         ${r.roles
           .map(
-            (role) => `
-          <div class="role-card">
-            <div class="role-head"><span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
+            (role, ri) => `
+          <div class="role-card rc-col" style="background:${TILE_BG[ri % 4]}">
+            <div class="role-head"><span class="rc-name"><span class="tile" style="background:#fff;width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
             <div class="names">${role.members.length ? role.members.map(person).join('') : '<span class="muted small">배정된 사람이 없어요</span>'}</div>
           </div>`,
           )

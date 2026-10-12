@@ -26,9 +26,10 @@ service cloud.firestore {
         && request.resource.data.roles is list
         && request.resource.data.roles.size() <= 12;
 
-      // 방장은 배정 뒤에도 역할의 설명·할 일(guides)만 고칠 수 있다 (배정 결과에는 영향 없음)
+      // 방장과 방에 들어온 팀원은 배정 뒤에도 역할의 설명·할 일(guides)만 고칠 수 있다 (배정 결과에는 영향 없음)
       allow update: if signedIn()
-        && resource.data.creatorUid == request.auth.uid
+        && (resource.data.creatorUid == request.auth.uid
+            || exists(/databases/$(database)/documents/rooms/$(code)/members/$(request.auth.uid)))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guides'])
         && request.resource.data.guides is map;
 

@@ -81,7 +81,7 @@ test('비공개 설명은 본인 것만 만들어지고 다른 사람의 선호�
   // 공개 결과에는 uid별 선호 키가 없다
   assert.equal(pub.includes('"prefs"'), false);
   assert.ok(out.privateByUid.u1.lines.length >= 1);
-  assert.equal(out.publicResult.summary.conflictCount, 0);
+  assert.equal(out.publicResult.summary.conflictCount, undefined); // 팀 공개 결과에는 "피하고 싶어요" 배정 건수를 싣지 않는다
 });
 
 test('입력 정리: 이상한 값과 긴 글을 걸러낸다', () => {

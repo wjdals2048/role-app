@@ -79,7 +79,7 @@ test('예2: 3명 4역할 — B는 하기 싫은 역할만 남아 역할 없음(�
   assert.ok(r.byPerson.B.length <= 1);
 });
 
-test('예3: 4명 모두 발표 싫다 — 충돌 1건, 설명에 "충돌"이 들어가고 무작위 아님이면 규칙으로 설명', () => {
+test('예3: 4명 모두 발표 싫다 — 충돌 1건, 설명에 "피하고 싶어요" 배정 안내가 들어가고 무작위 아님이면 규칙으로 설명', () => {
   const ctx = {
     people: ['A', 'B', 'C', 'D'], roles: roles4,
     prefs: {
@@ -93,7 +93,7 @@ test('예3: 4명 모두 발표 싫다 — 충돌 1건, 설명에 "충돌"이 들
   assert.equal(r.avoid, 1);
   const who = ctx.people.find((p) => r.byPerson[p].includes('present'));
   const msg = explainForPerson(r, ctx, who).join(' ');
-  assert.match(msg, /충돌/);
+  assert.match(msg, /"피하고 싶어요"로 고른 역할이 배정됐어요/);
   // 전원이 싫다고 한 역할은 누가 맡아도 같은 점수라, 같은 사람이 항상 걸리는지(규칙) 아닌지(무작위)를 stable이 구분해야 한다
   assert.equal(typeof r.stable[`${who}|present`], 'boolean');
 });

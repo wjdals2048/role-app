@@ -79,6 +79,12 @@ export function createFirebaseStore(config) {
     async updateRoles(code, roles) {
       await updateDoc(doc(db, 'rooms', code), { roles });
     },
+    async updateGuide(code, roleId, guide) {
+      await updateDoc(doc(db, 'rooms', code), { [`guides.${roleId}`]: guide });
+    },
+    async updateOwners(code, roleId, list) {
+      await updateDoc(doc(db, 'rooms', code), { [`owners.${roleId}`]: list });
+    },
     async getMyPrefs(code) {
       const s = await getDoc(doc(db, 'rooms', code, 'prefs', uid));
       return s.exists() ? s.data() : null;

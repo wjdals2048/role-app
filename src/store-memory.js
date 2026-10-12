@@ -67,6 +67,18 @@ export function createMemoryStore() {
       d.rooms[code].room.roles = roles;
       write(d);
     },
+    async updateGuide(code, roleId, guide) {
+      const d = read();
+      const room = d.rooms[code].room;
+      room.guides = { ...(room.guides || {}), [roleId]: guide };
+      write(d);
+    },
+    async updateOwners(code, roleId, list) {
+      const d = read();
+      const room = d.rooms[code].room;
+      room.owners = { ...(room.owners || {}), [roleId]: list };
+      write(d);
+    },
     async getMyPrefs(code) {
       return read().rooms[code]?.prefs?.[uid] || null;
     },

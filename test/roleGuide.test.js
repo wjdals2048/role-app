@@ -27,40 +27,36 @@ test('템플릿은 모든 종류에 있고, 내용이 안전한 길이다', () =
   for (const k of KIND_IDS) assert.ok(GUIDE_TEMPLATES[k], k);
   for (const [k, tp] of Object.entries(GUIDE_TEMPLATES)) {
     assert.ok(tp.desc.length <= 60, k);
-    for (const ph of ['start', 'during', 'end']) {
-      assert.ok(tp.steps[ph].length <= 3, `${k}.${ph}`);
-      for (const x of tp.steps[ph]) assert.ok(x.length <= 30, `${k}: ${x}`);
-    }
+    assert.ok(tp.tasks.length <= 9, k);
+    for (const x of tp.tasks) assert.ok(x.length <= 30, `${k}: ${x}`);
   }
-  assert.deepEqual(templateFor('없는종류'), { desc: '', steps: { start: [], during: [], end: [] } });
-  const a = templateFor('lead'); a.steps.start.push('x');
-  assert.notEqual(templateFor('lead').steps.start.length, a.steps.start.length); // 복사본
+  assert.deepEqual(templateFor('없는종류'), { desc: '', tasks: [] });
+  const a = templateFor('lead'); a.tasks.push('x');
+  assert.notEqual(templateFor('lead').tasks.length, a.tasks.length); // 복사본
 });
 
-test('normalizeRoles: 설명·할 일 길이 제한, 알 수 없는 종류는 비움, 개수 제한', () => {
+test('normalizeRoles: 설명·할 일 길이 제한, 알 수 없는 종류는 비움, 줄 수는 제한 없음', () => {
   const [r] = normalizeRoles([{
     id: 'r1', name: '발표', kind: 'weird', desc: 'ㄱ'.repeat(100),
-    steps: { start: ['a'.repeat(50), '', '  ', 't2', 't3', 't4'], during: 'bad', end: ['e'] },
+    tasks: ['a'.repeat(50), '', '  ', 't2', 't3', 't4'],
   }]);
   assert.equal(r.kind, '');
   assert.equal(r.desc.length, 60);
-  assert.equal(r.steps.start.length, 3);
-  assert.equal(r.steps.start[0].length, 30);
-  assert.deepEqual(r.steps.during, []);
-  assert.deepEqual(r.steps.end, ['e']);
+  assert.equal(r.tasks.length, 4); // 줄 수는 제한하지 않는다(안전 한도만)
+  assert.equal(r.tasks[0].length, 30);
   const [q] = normalizeRoles([{ id: 'r2', name: '정리', kind: 'doc' }]);
-  assert.deepEqual(q.steps, { start: [], during: [], end: [] });
-  const [z] = normalizeRoles([{ id: 'r3', name: 'x', tasks: ['예전 형식'], transient: 'stepsText' }]);
-  assert.deepEqual(z.steps.during, ['예전 형식']); // 이전 형식은 "진행하는 동안"으로
+  assert.deepEqual(q.tasks, []);
+  const [z] = normalizeRoles([{ id: 'r3', name: 'x', steps: { start: ['a'], during: 'bad', end: ['c'] }, transient: 'tasksText' }]);
+  assert.deepEqual(z.tasks, ['a', 'c']); // 이전 형식(시기별)은 순서대로 한 목록으로
   assert.equal(z.transient, undefined);
 });
 
 test('공개 결과의 역할에 설명·할 일이 들어간다', async () => {
-  const room = { roles: [{ id: 'r1', name: '발표', need: 1, load: 3, kind: 'present', desc: '앞에서 전달해요', steps: { start: [], during: ['연습하기'], end: [] } }] };
+  const room = { roles: [{ id: 'r1', name: '발표', need: 1, load: 3, kind: 'present', desc: '앞에서 전달해요', tasks: ['연습하기'] }] };
   const out = await runAssignment({ room, members: [{ uid: 'u1', nickname: '가' }], prefsByUid: { u1: { prefs: { r1: 'want' }, randomConsent: true } }, seed: 1 });
   const role = out.publicResult.roles[0];
   assert.equal(role.desc, '앞에서 전달해요');
-  assert.deepEqual(role.steps.during, ['연습하기']);
+  assert.deepEqual(role.tasks, ['연습하기']);
   assert.equal(role.kind, 'present');
 });
 

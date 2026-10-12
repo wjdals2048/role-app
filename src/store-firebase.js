@@ -50,12 +50,12 @@ export function createFirebaseStore(config) {
     get uid() {
       return uid;
     },
-    async createRoom({ roles, nickname, name }) {
+    async createRoom({ roles, nickname, name, avatar }) {
       for (let i = 0; i < 6; i++) {
         const code = makeCode();
         try {
           await setDoc(doc(db, 'rooms', code), { creatorUid: uid, status: 'collecting', roles, createdAt: serverTimestamp(), ...(name ? { name } : {}) });
-          await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp() });
+          await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp(), ...(avatar ? { avatar } : {}) });
           return code;
         } catch (e) {
           if (e.code !== 'permission-denied') throw e; // 이미 있는 코드면 규칙이 거부한다 → 다른 코드로 재시도
@@ -73,8 +73,11 @@ export function createFirebaseStore(config) {
     subscribeResult: (code, cb) => watch(doc(db, 'rooms', code, 'results', 'public'), cb, (s) => (s.exists() ? s.data() : null)),
     subscribePrivate: (code, cb) =>
       watch(doc(db, 'rooms', code, 'results_private', uid), cb, (s) => (s.exists() ? s.data() : null)),
-    async join(code, nickname) {
-      await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp() });
+    async join(code, nickname, avatar) {
+      await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp(), ...(avatar ? { avatar } : {}) });
+    },
+    async setAvatar(code, avatar) {
+      await updateDoc(doc(db, 'rooms', code, 'members', uid), { avatar });
     },
     async updateRoles(code, roles) {
       await updateDoc(doc(db, 'rooms', code), { roles });

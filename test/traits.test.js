@@ -50,7 +50,7 @@ test('설명: 못 맡은 "하고 싶다"는 하기 싫다 최소화 규칙으로
   assert.deepEqual(r.byPerson.min, ['lead']);
   assert.deepEqual(r.byPerson.jeong, ['pres']);
   const msg = explainForPerson(r, ctx, 'min').join('\n');
-  assert.match(msg, /"발표" — 하고 싶다고 했지만 이번에는 맡지 못했어요/);
+  assert.match(msg, /발표 · 하고 싶어요 — 이번에는 맡지 못했어요/);
   assert.match(msg, /2순위\("모두 역할 1개 이상"\)/);
   assert.match(msg, /"피하고 싶어요" 배정 증가/);
   const jeongMsg = explainForPerson(r, ctx, 'jeong').join('\n');

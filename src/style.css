@@ -411,3 +411,244 @@ body:not(.is-start)::after { content: ''; position: fixed; right: -60px; top: 58
 .duty-head .tile.l { width: 84px; height: 84px; border-radius: 30px; box-shadow: 0 8px 20px rgba(60,70,160,.14); }
 .duty-head h3 { font-size: 28px; }
 .duty-head p { opacity: 1; color: #4B5170; }
+
+/* ===== 와이어프레임 일치: 헤더 · 입력 · 칩 ===== */
+#app { padding-top: 6px; }
+.topbar { padding-top: 12px; }
+.topbar .wm-svg { width: 52px; height: 28px; }
+.back-row { display: flex; align-items: center; justify-content: space-between; height: 34px; margin-top: -30px; position: relative; z-index: 2; }
+.back-chev { background: none; border: 0; padding: 0 8px 0 0; font-size: 30px; line-height: 1; color: #4452C8; text-decoration: none; cursor: pointer; width: 34px; text-align: left; }
+.back-row .badge.demo { font-size: 11px; padding: 2px 8px; }
+.page-title { font-size: 28px; letter-spacing: -.03em; }
+input[type=text], input:not([type]), select { border-radius: 20px; border: 0; box-shadow: 0 0 0 1.5px #E3E6F8; padding: 15px 18px; background: #fff; }
+input[type=text]:focus { outline: 0; box-shadow: 0 0 0 2px #BFC8FF; }
+label { font-size: 13px; }
+.tag.req { background: #4452C8; color: #fff; border-radius: 8px; padding: 2px 8px; font-size: 12px; }
+.chip { border: 0; box-shadow: 0 0 0 1.5px #E3E6F8; background: #fff; color: #4B5170; border-radius: 999px; padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed='true'] { background: #BFC8FF; box-shadow: none; color: var(--ink); }
+input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE4; background: transparent; padding: 16px 20px; }
+.tg { font-size: 12px; background: #E4E8FF; color: #3C49B8; border-radius: 8px; padding: 2px 8px; white-space: nowrap; }
+.tg.ok { background: #fff; color: #1F2340; }
+.sec-h { font-size: 20px; margin: 18px 4px 10px; }
+
+/* 방 만들기: 버튼을 아래로 */
+.create { min-height: calc(100vh - 110px); display: flex; flex-direction: column; }
+.create #create { margin-top: auto; }
+.create #create.off { background: #E4E7F5; color: #8A90AD; }
+
+/* 방 카드 (허브) */
+.room-top { position: relative; padding: 18px 20px 16px; margin-top: 8px; }
+.room-top .rt-mata { position: absolute; right: 16px; top: 12px; width: 64px; height: auto; }
+.room-top .room-title { font-size: 19px; margin: 0; padding-right: 76px; }
+.rt-meta { color: var(--muted); font-size: 13px; margin: 4px 0 6px; }
+.room-top .code-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.room-top .code { font-size: 30px; letter-spacing: .12em; }
+.rt-btns { display: flex; gap: 6px; }
+.pill-btn { font: inherit; font-size: 13px; background: #fff; color: #1F2340; border: 0; box-shadow: 0 0 0 1.5px #DADFF7; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+
+/* 허브: 할 일 카드 */
+.hub-task { padding: 14px 16px; border: 0; border-radius: 26px; background: #fff; box-shadow: 0 0 0 1.5px #E3E6F8; margin-bottom: 12px; justify-content: flex-start; gap: 14px; }
+.hub-task .task-body { flex: 1; }
+.hub-task .task-body b { font-size: 17px; }
+.hub-task .tile { width: 48px; height: 48px; border-radius: 17px; }
+.hub-task.done { background: #BDEFDD; box-shadow: none; }
+.slot-box { background: #DDE1FF; border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.slot-box b { font-size: 15px; }
+.slot-chips { display: flex; gap: 8px; }
+.slot-chips span { background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 14px; }
+
+/* 참여 현황 */
+.members-sec { margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }
+.members-sec .sec-h { margin: 6px 4px 0; }
+.avs { display: flex; gap: 16px; padding: 0 4px; flex-wrap: wrap; }
+.av-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; }
+.av-c { position: relative; width: 56px; height: 56px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 0 0 2px #fff; }
+.av-item.done .av-c { box-shadow: 0 0 0 4px #BDEFDD; }
+.av-ok { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: #BDEFDD; color: #237F58; font-style: normal; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+#do-assign:disabled { background: #E4E7F5; color: #8A90AD; opacity: 1; }
+.center { text-align: center; }
+#force-assign { display: block; margin: 4px auto 0; }
+
+/* 닉네임 정하고 들어가기 */
+#s-join { display: flex; flex-direction: column; gap: 14px; }
+.jn-room { display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 999px; padding: 16px 22px; box-shadow: 0 0 0 1.5px #E3E6F8; margin-top: 8px; }
+.jn-room b { color: var(--brand); letter-spacing: .14em; font-size: 20px; }
+.jn-head { display: flex; align-items: flex-start; justify-content: space-between; margin-top: 8px; }
+.jn-title { font-size: 34px; margin-bottom: 8px; }
+.jn-taba { width: 110px; height: auto; transform: scaleX(-1) rotate(4deg); }
+.jn-roles { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.back-row .badge.demo { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 50; }
+.back-chev { width: auto; white-space: nowrap; }
+.back-chev:not(:only-child) { }
+
+/* 역할 설정 */
+.page-head { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 10px; }
+.page-head .ph-mata { width: 78px; height: auto; margin-right: 4px; }
+.roles-card { padding: 18px; gap: 14px; }
+.roles-card .role-head, .roles-card > div > .role-head { display: none; }
+.role-block { border: 0; padding: 0; }
+.role-block + .role-block { border-top: 2px dashed #DDE1FF; padding-top: 14px; }
+.role-edit { display: flex; align-items: center; gap: 10px; }
+.role-edit .tile { width: 54px; height: 54px; border-radius: 19px; }
+.role-edit .r-name { flex: 1; min-width: 0; border-radius: 999px; padding: 15px 20px; }
+.role-edit .r-need { width: 84px; border-radius: 999px; padding: 15px 10px; }
+.role-edit .r-del { background: transparent; box-shadow: none; color: #8A90AD; }
+.role-more > summary { list-style: none; text-align: center; color: #4452C8; font-size: 14px; padding: 8px 0 2px; cursor: pointer; }
+.role-more > summary::-webkit-details-marker { display: none; }
+.role-more > summary::before { content: '▸ '; }
+.role-more[open] > summary::before { content: '▾ '; }
+.load-seg { display: flex; gap: 8px; margin-top: 6px; }
+.load-opt { flex: 1; font: inherit; font-size: 14px; padding: 12px 6px; border-radius: 999px; border: 0; background: #fff; box-shadow: 0 0 0 1.5px #E3E6F8; color: #4B5170; cursor: pointer; }
+.load-opt.on { background: #BFC8FF; box-shadow: none; color: var(--ink); }
+.pf-stack { position: relative; }
+.pf-taba { position: absolute; left: -8px; top: -26px; width: 84px; height: auto; z-index: 3; transform: rotate(-12deg); }
+.pf-notes li { display: flex; align-items: center; gap: 10px; }
+.pf-sum-head { display: flex; justify-content: space-between; align-items: flex-start; }
+.pf-sum-title { font-size: 28px; line-height: 1.3; }
+.pf-sum-taba { width: 96px; height: auto; transform: rotate(6deg); margin-top: -18px; }
+.pf .check { background: #E4E8FF; border-radius: 20px; padding: 14px 16px; }
+.pf-rows + .check { margin-top: 12px; }
+.res-flat { display: flex; flex-direction: column; gap: 4px; }
+.page-head.tm { align-items: flex-start; margin-top: 8px; }
+.tm-chars { display: inline-flex; align-items: flex-end; margin-right: 4px; }
+.tm-chars img { height: auto; }
+.tm-chars img + img { margin-left: -14px; }
+.back-chev.labeled { font-size: 15px; width: auto; }
+#s-result .btn.line { margin-top: 4px; }
+.mine-top + .card, #s-mine .card { }
+
+/* 역할 카드: 위(이름) 흰 카드 + 아래(할 일) 연보라 상자 */
+.duty { background: transparent; box-shadow: none; overflow: visible; border-radius: 0; }
+.duty-head { background: #fff; border-radius: 28px; box-shadow: 0 10px 30px rgba(60,70,160,.10); padding: 26px 18px 22px; }
+.duty-head .tile.l { box-shadow: none; }
+.duty-head p { color: var(--muted); }
+.duty .phase, .duty .duty-empty { background: #DDE1FF; border-radius: 22px; margin-top: 12px; padding: 16px 18px; border: 0; }
+.duty .phase h4 { color: #4B5170; font-size: 13px; }
+.duty .phase + .phase { border: 0; }
+.back-chev.labeled { font-size: 16px; }
+
+/* ===== 피드백 반영 ===== */
+/* 선호 입력: 뒤 카드가 덜 튀어나오게 */
+.pf-back { left: 14px; right: 14px; top: 24px; height: auto; bottom: -12px; border-radius: 34px; box-shadow: 0 6px 14px rgba(60,70,160,.10); }
+.pf-back.b1 { transform: rotate(2deg); }
+.pf-back.b2 { transform: rotate(-2deg); bottom: -8px; }
+.pf-stack { padding-bottom: 20px; }
+/* 참여 현황 체크 */
+.av-ok { background: #fff; box-shadow: 0 0 0 3px #BDEFDD; width: 24px; height: 24px; right: -6px; bottom: -6px; }
+.av-item.done .av-c { box-shadow: 0 0 0 4px #7ED8B4; }
+/* 내 결과: 가로로 넘겨 보기 */
+.my-roles.multi { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 6px -16px 0; padding: 4px 16px 12px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.my-roles.multi::-webkit-scrollbar { display: none; }
+.my-roles.multi .my-hero { flex: 0 0 74%; scroll-snap-align: center; background: #fff; border-radius: 28px; padding: 18px 12px 16px; margin-top: 0; box-shadow: 0 10px 30px rgba(60,70,160,.10); }
+.my-roles.multi .my-hero .tile.l { width: 72px !important; height: 72px !important; border-radius: 26px !important; background: #DDE1FF !important; box-shadow: none; }
+.my-roles.multi .my-hero .tile.l svg { width: 40px; height: 40px; }
+.my-roles.multi .my-role-name { font-size: 26px; }
+/* 나의 배정 이유 */
+.why-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.why-list li { padding: 12px 0; border-top: 1px solid #ECEEFA; }
+.why-list li:first-child { border-top: 0; padding-top: 4px; }
+.why-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.why-h b { font-size: 16px; }
+.why-list p { color: #4B5170; font-size: 14px; line-height: 1.6; word-break: keep-all; }
+/* 규칙 설명 */
+.rules > summary { cursor: pointer; font-size: 16px; padding: 2px 0; }
+.rules-lead { margin: 10px 0 6px; }
+.rules-list { margin: 0; padding: 0 0 0 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.5; }
+.rules-foot { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ECEEFA; line-height: 1.6; word-break: keep-all; }
+/* 역할 설정: 더보기를 눈에 띄게, 아이콘 선택 */
+.role-more > summary { display: block; margin: 8px auto 0; width: fit-content; background: #EEF0FF; border-radius: 999px; padding: 8px 16px; font-size: 14px; }
+.role-edit .r-icon { border: 0; cursor: pointer; }
+.kind-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
+.kind-opt { font: inherit; border: 0; border-radius: 16px; padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; color: var(--ink); }
+.kind-opt small { font-size: 12px; line-height: 1.2; text-align: center; }
+.kind-opt.on { box-shadow: 0 0 0 3px #1F2340; }
+
+/* ===== 2차 피드백 ===== */
+/* 선호 입력: 와이어프레임처럼 같은 크기 카드가 양옆으로 기울어 겹침 */
+.pf { max-width: 400px; margin-left: auto; margin-right: auto; }
+.pf-stack { padding-bottom: 0; min-height: 0; margin: 4px 8px 16px; }
+.pf-back { left: 0; right: 0; top: 0; bottom: 0; height: auto; border-radius: 38px; box-shadow: 0 8px 20px rgba(60,70,160,.12); }
+.pf-back.b1 { background: #FFD97A; transform: rotate(6deg); bottom: 0; }
+.pf-back.b2 { background: #9FE3C8; transform: rotate(-6deg); bottom: 0; }
+.pf-card { z-index: 1; }
+/* 내 결과: 격자 */
+.my-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
+.my-cell { border-radius: 24px; padding: 18px 10px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; box-shadow: 0 8px 20px rgba(60,70,160,.08); }
+.my-cell b { font-size: 18px; word-break: keep-all; }
+/* 배정 이유: 선호 색, 막대 */
+.tg.pf-want { background: #BDEFDD; color: #1F6B49; }
+.tg.pf-avoid { background: #FFD3CB; color: #7A3A31; }
+.tg.pf-ok { background: #E9EBF5; color: #4B5170; }
+.bars { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.bar-row { display: grid; grid-template-columns: 56px 1fr 40px; align-items: center; gap: 8px; font-size: 13px; color: #4B5170; }
+.bar-row i { display: block; height: 14px; border-radius: 999px; background: #8E9BF0; min-width: 6px; }
+.bar-row.avg i { background: #D5D9EE; }
+.bar-row em { font-style: normal; text-align: right; }
+/* 역할 카드: 할 일 상자 색 = 아이콘 색 */
+.duty .phase, .duty .duty-empty { background: var(--rc, #DDE1FF); }
+/* 아이콘 선택판 */
+.kind-panel { background: #F3F4FF; border-radius: 22px; padding: 12px; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.kind-grid { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); margin-top: 0; gap: 8px; }
+.kind-opt { width: 100%; aspect-ratio: 1; border-radius: 17px; padding: 0; justify-content: center; }
+.kind-opt.on { box-shadow: 0 0 0 3px #1F2340; }
+
+/* ===== 3차 ===== */
+.my-cell { background: #fff; }
+.kind-grid { grid-template-columns: repeat(6, 1fr); }
+.kind-panel { padding: 12px; }
+/* 4차: 아이콘 선택 작게, 안내 */
+.kind-grid { grid-template-columns: repeat(6, 40px); gap: 8px; justify-content: start; }
+.kind-opt { width: 40px; height: 40px; aspect-ratio: auto; border-radius: 13px; }
+.kind-opt svg { width: 20px; height: 20px; }
+.kind-panel { padding: 10px; }
+.bar-note { margin: 6px 0 0; font-size: 12px; color: #6B6F8F; }
+/* 5차: 와이어프레임 폭(모바일 프레임)에 맞춤 */
+#app, .topbar, .sheet { max-width: 440px; }
+.kind-grid { grid-template-columns: repeat(6, 1fr); gap: 10px; justify-content: stretch; }
+.kind-opt { width: 100%; height: auto; aspect-ratio: 1; max-width: 56px; justify-self: center; border-radius: 16px; }
+.kind-opt svg { width: 24px; height: 24px; }
+.kind-panel { padding: 14px 12px; }
+/* 6차: 프로필 캐릭터 */
+.avimg { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; flex: none; }
+.avimg img { width: 88%; height: 88%; object-fit: contain; pointer-events: none; }
+.nick-row { display: flex; align-items: center; gap: 10px; }
+.nick-row input { flex: 1; min-width: 0; }
+.av-btn { position: relative; width: 56px; height: 56px; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; flex: none; }
+.av-btn .avimg { width: 56px; height: 56px; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #DDE1FF; }
+.av-edit { position: absolute; right: -2px; bottom: -2px; width: 22px; height: 22px; border-radius: 50%; background: var(--brand, #4452C8); color: #fff; font-style: normal; font-size: 12px; line-height: 22px; text-align: center; box-shadow: 0 0 0 2px #fff; }
+.avp-wrap { margin-top: 10px; background: #F3F4FF; border-radius: 22px; padding: 12px; }
+.avp-wrap .muted { margin: 8px 0 0; text-align: center; }
+.avp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.avp-opt { padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; aspect-ratio: 1; max-width: 52px; justify-self: center; width: 100%; }
+.avp-opt .avimg { width: 100%; height: 100%; }
+.avp-opt.on { box-shadow: 0 0 0 3px #1F2340; }
+.av-c.av-me { border: 0; padding: 0; cursor: pointer; background: none; }
+.av-c .avimg { width: 100%; height: 100%; }
+.member .av.avimg { width: 34px; height: 34px; }
+/* 7차: 입력 완료 표시는 민트 배경과 겹치지 않는 코랄 */
+.av-item.done .av-c { box-shadow: 0 0 0 3px #F7A79E; border-radius: 50%; }
+.av-ok { background: #EF5A4C; box-shadow: 0 0 0 3px #fff; }
+.av-ok svg path { stroke: #fff; }
+.av-me .av-edit { right: auto; left: -4px; bottom: -4px; }
+/* 8차: 기본 팔레트의 붉은 파스텔(peach) */
+.av-item.done .av-c { box-shadow: 0 0 0 4px #FFD3CB; }
+.av-ok { background: #FFD3CB; box-shadow: 0 0 0 3px #fff; }
+.av-ok svg path { stroke: #B5483C; }
+/* 9차: 입력 완료 표시는 다시 민트(마타 배경은 붉은 파스텔로 바뀌어 겹치지 않음) */
+.av-item.done .av-c { box-shadow: 0 0 0 4px #7ED8B4; }
+.av-ok { background: #fff; box-shadow: 0 0 0 3px #BDEFDD; }
+.av-ok svg path { stroke: #1F6B49; }
+.avimg { box-shadow: inset 0 0 0 1.5px #E3E6F8; }
+/* 10차: 프로필 테두리 */
+.avimg { box-shadow: none; border: 2.5px solid #C5CCF7; box-sizing: border-box; }
+.av-btn .avimg { box-shadow: none; }
+.member .av.avimg { border-width: 2px; }
+.member .av.avimg { box-shadow: none; }
+/* 11차: 캐릭터 색 테두리 (마타 보라 · 타바 노랑) */
+.avimg.cm { border-color: #9D8FEA; }
+.avimg.ct { border-color: #F5C04D; }
+.avimg img { width: 100%; height: 100%; }
+/* 12차: 선택된 프로필 표시 — 검은 선 대신 프로필 위에 딱 맞는 남색 링 */
+.avp-opt.on { box-shadow: none; }
+.avp-opt { overflow: visible; }
+.avp-opt.on .avimg { box-shadow: 0 0 0 2px #F3F4FF, 0 0 0 5px #4452C8; }

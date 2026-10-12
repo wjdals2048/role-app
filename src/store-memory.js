@@ -34,14 +34,14 @@ export function createMemoryStore() {
     get uid() {
       return uid;
     },
-    async createRoom({ roles, nickname, name }) {
+    async createRoom({ roles, nickname, name, avatar }) {
       const d = read();
       let code;
       do code = Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
       while (d.rooms[code]);
       d.rooms[code] = {
         room: { creatorUid: uid, status: 'collecting', roles, ...(name ? { name } : {}) },
-        members: { [uid]: { nickname, submitted: false } },
+        members: { [uid]: { nickname, submitted: false, ...(avatar ? { avatar } : {}) } },
         prefs: {},
         result: null,
         privates: {},
@@ -57,9 +57,9 @@ export function createMemoryStore() {
       sub((d) => Object.entries(d.rooms[code]?.members || {}).map(([id, m]) => ({ uid: id, ...m })), cb),
     subscribeResult: (code, cb) => sub((d) => d.rooms[code]?.result || null, cb),
     subscribePrivate: (code, cb) => sub((d) => d.rooms[code]?.privates?.[uid] || null, cb),
-    async join(code, nickname) {
+    async join(code, nickname, avatar) {
       const d = read();
-      d.rooms[code].members[uid] = { nickname, submitted: false };
+      d.rooms[code].members[uid] = { nickname, submitted: false, ...(avatar ? { avatar } : {}) };
       write(d);
     },
     async updateRoles(code, roles) {
@@ -86,6 +86,11 @@ export function createMemoryStore() {
       const d = read();
       d.rooms[code].prefs[uid] = data;
       d.rooms[code].members[uid].submitted = true;
+      write(d);
+    },
+    async setAvatar(code, avatar) {
+      const d = read();
+      d.rooms[code].members[uid].avatar = avatar;
       write(d);
     },
     async setMessage(code, message) {

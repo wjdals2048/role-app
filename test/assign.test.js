@@ -93,7 +93,7 @@ test('예3: 4명 모두 발표 싫다 — 충돌 1건, 설명에 "피하고 싶�
   assert.equal(r.avoid, 1);
   const who = ctx.people.find((p) => r.byPerson[p].includes('present'));
   const msg = explainForPerson(r, ctx, who).join(' ');
-  assert.match(msg, /"피하고 싶어요"로 고른 역할이 배정됐어요/);
+  assert.match(msg, /피하고 싶다고 했지만/);
   // 전원이 싫다고 한 역할은 누가 맡아도 같은 점수라, 같은 사람이 항상 걸리는지(규칙) 아닌지(무작위)를 stable이 구분해야 한다
   assert.equal(typeof r.stable[`${who}|present`], 'boolean');
 });

@@ -1,8 +1,9 @@
 import './style.css';
 import { createStore } from './store.js';
 import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, LOAD_LABEL } from '../lib/roomService.js';
+import { AVATAR_IDS, AVATAR_BG, AVATAR_LABEL, validAvatar, defaultAvatar } from '../lib/avatars.js';
 import { relevantTraits, suggestPrefs } from '../lib/traits.js';
-import { KINDS, DESC_MAX, STEP_MAX, STEP_COUNT, kindFromName, kindOfRole, exampleDesc, templateFor } from '../lib/roleGuide.js';
+import { KINDS, ICON_IDS, DESC_MAX, STEP_MAX, STEP_COUNT, kindFromName, kindOfRole, exampleDesc, templateFor } from '../lib/roleGuide.js';
 
 const $app = document.getElementById('app');
 const $toast = document.getElementById('toast');
@@ -34,6 +35,18 @@ const savedNick = () => {
 const saveNick = (n) => {
   try { localStorage.setItem('roleapp-nick', n); } catch { /* 저장 못 해도 동작에는 문제 없음 */ }
 };
+/* 프로필 캐릭터: 방 안에서는 닉네임처럼 공개되는 정보. 이 브라우저에 마지막 선택을 기억해 다음 방에서 먼저 보여 준다. */
+const savedAvatar = () => {
+  try { const a = localStorage.getItem('roleapp-avatar'); return validAvatar(a) ? a : ''; } catch { return ''; }
+};
+const saveAvatar = (a) => {
+  try { localStorage.setItem('roleapp-avatar', a); } catch { /* 저장 못 해도 동작에는 문제 없음 */ }
+};
+let draftAv = savedAvatar() || (Math.random() < 0.5 ? 'M_base' : 'T_base');
+const avatarOf = (m) => (validAvatar(m?.avatar) ? m.avatar : defaultAvatar(m?.uid || m?.nickname || ''));
+const avOfUid = (uid) => avatarOf(S?.members?.find((m) => m.uid === uid) || { uid });
+const avatarHtml = (id, cls = '', extra = '') => `<span class="avimg c${id[0].toLowerCase()} ${cls}" style="background:${AVATAR_BG[id[0]] || '#DDE1FF'}"${extra}><img src="/avatars/${id}.png" alt="" draggable="false" /></span>`;
+const avatarPickerHtml = (cur, mode) => `<div class="avp" data-avp="${mode}" role="group" aria-label="프로필 캐릭터">${AVATAR_IDS.map((id) => `<button type="button" class="avp-opt${id === cur ? ' on' : ''}" data-av="${id}" aria-pressed="${id === cur}" aria-label="${id[0] === 'M' ? '마타' : '타바'} ${AVATAR_LABEL[id.slice(2)]}">${avatarHtml(id)}</button>`).join('')}</div>`;
 /* 최근 들어간 방: 이 브라우저에만 저장한다(계정이 없어서 다른 기기에서는 보이지 않는다) */
 const RECENT_KEY = 'roleapp-recent-rooms';
 function recentRooms() {
@@ -128,7 +141,7 @@ const CHARS = [
     key: 'M', cls: 'mata', name: '마타', en: 'MATA', hero: '/mata.png', color: '라벤더 퍼플', hex: '#8274E8',
     say: '함께라면 더 잘할 수 있어!',
     intro: '차분하고 꼼꼼해요. 다른 사람의 마음을 잘 헤아리고, 팀원들이 편하게 의견을 말할 수 있도록 도와줘요.',
-    like: '팀원들의 다양한 의견, 맛있는 간식, 조용한 카페, 계획 세우기',
+    like: '팀원들의 다양한 의견, 조용한 카페, 계획 세우기',
     dislike: '어색한 분위기, 무리한 결정, 혼자만의 부담',
   },
   {
@@ -146,7 +159,7 @@ function renderAbout(sel = 'M') {
   const c = CHARS.find((x) => x.key === sel);
   $app.innerHTML = `
     <main class="about">
-      <button type="button" class="link" id="back">← 처음으로</button>
+      <div class="back-row"><button type="button" class="link back-chev" id="back" aria-label="뒤로 가기">‹</button></div>
       <h1 class="about-title">마타·타바 소개</h1>
       <p class="muted">친구를 눌러 보세요</p>
       <div class="ab-tabs" role="tablist">
@@ -170,10 +183,7 @@ function renderAbout(sel = 'M') {
 function renderJoinCode() {
   cleanup();
   $app.innerHTML = `
-    <div class="row between" style="margin-top:4px">
-      <button type="button" class="link" id="back">← 처음으로</button>
-      ${modeBadge()}
-    </div>
+    <div class="back-row"><button type="button" class="link back-chev" id="back" aria-label="뒤로 가기">‹</button>${modeBadge()}</div>
     <section class="card stack" aria-labelledby="h-join">
       <div><h1 id="h-join" class="page-title">방 코드로 들어가기</h1><p class="muted" style="margin-top:6px">방장에게 받은 6자리 코드를 넣어 주세요. 닉네임은 다음 화면에서 정해요.</p></div>
       <input id="join-code" class="code-input" type="text" maxlength="6" placeholder="ABC123" aria-label="방 코드" autocomplete="off" autocapitalize="characters" />
@@ -197,10 +207,7 @@ function renderCreate() {
   const customList = home.custom.filter((n) => !TEMPLATES.some((t) => t.name === n));
   const chipIcon = (n) => { const k = kindFromName(n); return k ? roleIcon({ kind: k }, 15) : ''; };
   $app.innerHTML = `
-    <div class="row between" style="margin-top:4px">
-      <button type="button" class="link" id="back">← 처음으로</button>
-      ${modeBadge()}
-    </div>
+    <div class="back-row"><button type="button" class="link back-chev" id="back" aria-label="뒤로 가기">‹</button>${modeBadge()}</div>
     <section class="create stack" aria-labelledby="h-create">
       <div class="create-head"><h1 id="h-create" class="page-title">방 만들기</h1><img class="create-mata" src="/mata.png" alt="" width="78" height="82" /></div>
       <div>
@@ -210,7 +217,8 @@ function renderCreate() {
       </div>
       <div>
         <label for="nick">내 닉네임 <span class="tag req">필수</span><span class="cnt" id="cnt-nick"></span></label>
-        <input id="nick" type="text" maxlength="12" placeholder="예: 정민" value="${esc(savedNick())}" autocomplete="off" />
+        <div class="nick-row"><button type="button" class="av-btn" data-av-toggle="draft" aria-label="프로필 캐릭터 고르기">${avatarHtml(draftAv)}<i class="av-edit" aria-hidden="true">✎</i></button><input id="nick" type="text" maxlength="12" placeholder="예: 정민" value="${esc(savedNick())}" autocomplete="off" /></div>
+        <div class="avp-wrap" id="avp-draft" hidden>${avatarPickerHtml(draftAv, 'draft')}</div>
         <p class="err" id="err-nick" hidden>닉네임을 입력해 주세요</p>
       </div>
       <div>
@@ -292,7 +300,8 @@ function renderCreate() {
     try {
       saveNick(nickname);
       const name = normalizeRoomName(home.roomName);
-      const code = await store.createRoom({ roles, nickname, name });
+      saveAvatar(draftAv);
+      const code = await store.createRoom({ roles, nickname, name, avatar: draftAv });
       home.roomName = '';
       location.hash = `#/room/${code}`;
     } catch (err) {
@@ -307,18 +316,14 @@ function renderCreate() {
 /* ---------------- 방 ---------------- */
 function roomShell(code) {
   $app.innerHTML = `
-    <div class="row between" style="margin-top:4px">
-      <button type="button" class="link" id="back">← 처음으로</button>
-      ${modeBadge()}
-    </div>
-    <section class="card" id="room-card" aria-label="방 정보">
+    <div class="back-row"><button type="button" class="link back-chev" id="back" aria-label="뒤로 가기">‹</button>${modeBadge()}</div>
+    <section class="card room-top" id="room-card" aria-label="방 정보">
+      <img class="rt-mata" src="/mata-s.png" alt="" width="64" height="64" />
       <div id="room-title" class="room-title"></div>
-      <div class="muted small">방 코드</div>
+      <div class="rt-meta" id="s-status"></div>
       <div class="code-box"><span class="code" id="code-text">${esc(code)}</span>
-        <button type="button" class="btn ghost small" id="copy-code">코드 복사</button>
-        <button type="button" class="btn ghost small" id="copy-link">링크 복사</button>
+        <span class="rt-btns"><button type="button" class="pill-btn" id="copy-code">코드</button><button type="button" class="pill-btn" id="copy-link">링크</button></span>
       </div>
-      <div id="s-status" style="margin-top:8px"></div>
     </section>
     <div id="s-join"></div>
     <div id="s-hub"></div>
@@ -414,17 +419,18 @@ function applyView() {
   const onCard = joined && done && S.view === 'card';
   const onTeam = done && (!joined || S.view === 'team'); // 방에 아직 안 들어온 사람도 결과는 팀 화면으로 본다
   const onMine = joined && done && !onCard && !onTeam;
-  show('#room-card', !step && !onCard && !onMine);
+  show('#room-card', joined && !done && !step);
   show('#s-join', !joined);
   show('#s-hub', joined && !done && !step);
   show('#s-members', joined && !done && !step);
-  show('#s-roles', !joined || step === 'roles');
+  show('#s-roles', step === 'roles');
   show('#s-prefs', step === 'prefs');
   show('#s-mine', onMine);
   show('#s-result', onTeam);
   show('#s-duties', onCard);
   const back = $app.querySelector('#back');
-  if (back) back.textContent = onCard && S.cardFrom === 'team' ? '‹ 팀 결과로' : onCard || (onTeam && joined) ? '‹ 내 결과로' : step ? '← 방으로' : '← 처음으로';
+  if (back) back.classList.toggle('labeled', onCard || (onTeam && joined));
+  if (back) back.textContent = onCard && S.cardFrom === 'team' ? '‹ 팀 결과로' : onCard || (onTeam && joined) ? '‹ 내 결과로' : '‹';
 }
 
 /** 방장에게만: 역할 자리 수와 참여 인원을 비교해 안내한다. */
@@ -433,8 +439,9 @@ function slotGuide(roles) {
   const people = S.members.length;
   const slots = roles.reduce((s, r) => s + Math.min(r.need || 1, Math.max(people, 1)), 0);
   if (!people || !slots) return '';
-  if (slots > people) return `<p class="muted small">역할 자리는 ${esc(slots)}개, 참여는 ${esc(people)}명이에요. 일부 팀원이 역할을 2개 이상 맡을 수 있어요.</p>`;
-  if (slots < people) return `<p class="muted small">역할 자리(${esc(slots)}개)보다 참여 인원(${esc(people)}명)이 많아서, 역할을 못 받는 팀원이 생길 수 있어요.</p>`;
+  const box = (title) => `<div class="slot-box"><div class="row between"><b>${title}</b><span class="tg">방장에게만</span></div><div class="slot-chips"><span>역할 자리 ${esc(slots)}</span><span>참여 ${esc(people)}</span></div></div>`;
+  if (slots > people) return box(`한 명이 역할을 ${Math.ceil(slots / people)}개 맡을 수 있어요`);
+  if (slots < people) return box('역할을 못 받는 팀원이 생길 수 있어요');
   return '';
 }
 
@@ -445,25 +452,25 @@ function renderHub() {
   const roles = S.room.roles || [];
   const submitted = !!me().submitted;
   el.innerHTML = `
-    <section class="card stack">
-      <h2>내가 할 일</h2>
-      <button type="button" class="task" data-go="roles">
-        <span class="task-body"><b>1. 이번에 정할 역할</b><span class="muted small">${esc(roles.map((r) => r.name).join(' · '))}</span></span>
-        <span class="tag">${isCreator() ? '설정하기' : '확인하기'}</span>
-      </button>
-      <button type="button" class="task ${submitted ? 'done' : ''}" data-go="prefs">
-        <span class="task-body"><b>2. 내 선호 입력</b><span class="muted small">${submitted ? '저장했어요. 배정 전까지 바꿀 수 있어요.' : '하고 싶은 역할과 피하고 싶은 역할을 골라요. 다른 팀원에게는 보이지 않아요.'}</span></span>
-        <span class="tag ${submitted ? 'ok' : ''}">${submitted ? '완료 ✓' : '입력하기'}</span>
-      </button>
-      ${slotGuide(roles)}
-    </section>`;
+    <h2 class="sec-h">내가 할 일</h2>
+    <button type="button" class="task hub-task" data-go="roles">
+      <span class="tile" style="background:#FFD3CB">${roleIcon({ kind: 'lead' }, 28)}</span>
+      <span class="task-body"><b>이번에 정할 역할</b><span class="muted small">${esc(roles.map((r) => r.name).join(' · '))}</span></span>
+      <span class="tg">${isCreator() ? '설정' : '확인'}</span>
+    </button>
+    <button type="button" class="task hub-task ${submitted ? 'done' : ''}" data-go="prefs">
+      <span class="tile" style="background:#fff"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#4452C8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.600-7 10-7 10z"/></svg></span>
+      <span class="task-body"><b>내 선호 입력</b><span class="muted small">${submitted ? '저장했어요' : '하고 싶은 역할과 피하고 싶은 역할을 골라요'}</span></span>
+      <span class="tg ${submitted ? 'ok' : ''}">${submitted ? '완료 ✓' : '입력'}</span>
+    </button>
+    ${slotGuide(roles)}`;
 }
 
 function renderStatus() {
   const el = $app.querySelector('#s-status');
   const done = assigned();
-  el.innerHTML = `<span class="badge ${done ? 'done' : ''}">${done ? '배정 완료' : '선호를 모으는 중'}</span>
-    <span class="muted small" style="margin-left:6px">${esc(S.members.length)}명 참여</span>`;
+  const n = S.members.length; const sub = S.members.filter((m) => m.submitted).length;
+  el.textContent = done ? `${n}명 참여 · 배정 완료` : `${n}명 참여 · 선호 ${sub}/${n}`;
 }
 
 function renderJoin() {
@@ -474,13 +481,15 @@ function renderJoin() {
     return;
   }
   if (el.querySelector('#join-nick')) return; // 입력 중이면 다시 그리지 않음
+  const jroles = S.room?.roles || [];
   el.innerHTML = `
-    <section class="card stack">
-      <div><h2>닉네임을 정하고 들어가요</h2><p class="muted">다른 팀원에게는 이 이름으로 보여요. 이름·이메일은 받지 않아요.</p><p class="muted small" style="margin-top:6px">🔒 내가 고른 선호는 다른 팀원에게 공개되지 않아요.</p></div>
-      <input id="join-nick" type="text" maxlength="12" placeholder="예: 지은" value="${esc(savedNick())}" aria-label="닉네임" autocomplete="off" />
-      ${assigned() ? '<p class="notice">이미 배정이 끝난 방이에요. 지금 들어가도 이번 배정에는 포함되지 않아요.</p>' : ''}
-      <button type="button" class="btn" id="do-join">들어가기</button>
-    </section>`;
+    <div class="jn-room"><span>${esc(S.room?.name || '')}</span><b>${esc(S.code)}</b></div>
+    <div class="jn-head"><div><h1 class="jn-title">닉네임을<br>정해요</h1><p class="muted">선호는 팀원에게 공개되지 않아요</p></div><img class="jn-taba" src="/taba.png" alt="" width="110" height="110" /></div>
+    <div class="nick-row"><button type="button" class="av-btn" data-av-toggle="draft" aria-label="프로필 캐릭터 고르기">${avatarHtml(draftAv)}<i class="av-edit" aria-hidden="true">✎</i></button><input id="join-nick" type="text" maxlength="12" placeholder="예: 지은" value="${esc(savedNick())}" aria-label="닉네임" autocomplete="off" /></div>
+    <div class="avp-wrap" id="avp-draft" hidden>${avatarPickerHtml(draftAv, 'draft')}</div>
+    ${assigned() ? '<p class="notice">이미 배정이 끝난 방이에요. 지금 들어가도 이번 배정에는 포함되지 않아요.</p>' : ''}
+    <button type="button" class="btn big" id="do-join">들어가기</button>
+    <div class="jn-roles"><p class="muted">이번에 정할 역할</p><div class="chips">${jroles.map((r) => `<span class="chip">${roleIcon(r, 15)}${esc(r.name)} ${esc(r.need)}명</span>`).join('')}</div></div>`;
 }
 
 function renderRoles() {
@@ -508,44 +517,42 @@ function renderRoles() {
 function drawRolesEditor(el) {
   const d = S.rolesDraft;
   el.innerHTML = `
-    <section class="card stack">
-      <div><h2>역할 설정 <span class="badge">방장만</span></h2><p class="muted">필요 인원과 예상 일의 양을 정해 주세요. 해 보기 전엔 알기 어려우니 대략만 골라도 돼요. 중요도와는 관계없고, 한 사람에게 일이 몰리지 않게 나눌 때만 쓰여요. 역할마다 <b>설명과 할 일</b>을 적어 두면, 팀원이 선택할 때 참고하고 배정 뒤에는 "내 역할 카드"로 받아요.</p></div>
-      <div class="role-head"><span>역할 이름</span><span>필요 인원</span><span>예상 일의 양</span><span></span></div>
+    <div class="page-head"><h1 class="page-title">이번에 정할 역할</h1><img class="ph-mata" src="/mata.png" alt="" width="78" height="82" /></div>
+    <section class="card stack roles-card">
       ${d
         .map(
           (r, i) => `
         <div class="role-block" data-i="${i}">
           <div class="role-edit">
+            <button type="button" class="tile r-icon" data-open="1" aria-label="아이콘 바꾸기" style="background:${TILE_BG[i % 4]}">${roleIcon(r, 28)}</button>
             <input type="text" class="r-name" maxlength="20" value="${esc(r.name)}" aria-label="역할 이름" />
             <select class="r-need" aria-label="필요 인원">${[1, 2, 3].map((n) => `<option value="${n}" ${r.need === n ? 'selected' : ''}>${n}명</option>`).join('')}</select>
-            <select class="r-load" aria-label="예상 일의 양">${[1, 2, 3].map((n) => `<option value="${n}" ${r.load === n ? 'selected' : ''}>${LOAD_LABEL[n]}</option>`).join('')}</select>
             <button type="button" class="x r-del" aria-label="${esc(r.name || '이 역할')} 삭제">✕</button>
           </div>
           <details class="role-more" data-rid="${esc(r.id)}" ${S.rolesOpen.has(r.id) ? 'open' : ''}>
-            <summary>설명·할 일 ${r.desc || taskItemsOf(r).some((t) => t.trim()) ? '<span class="tag ok">작성됨</span>' : '<span class="tag">비어 있음</span>'}</summary>
+            <summary>더보기 (설명 · 할 일 · 일의 양) ${r.desc || taskItemsOf(r).some((t) => t.trim()) ? '<span class="tag ok">작성됨</span>' : '<span class="tag">비어 있음</span>'}</summary>
             <div class="stack role-more-body">
               <div>
-                <label>역할 종류 <span class="muted small">(성향 제안과 연결돼요)</span></label>
-                <select class="r-kind" aria-label="역할 종류">
-                  <option value="" ${!r.kind ? 'selected' : ''}>이름으로 자동 추정${!r.kind && kindFromName(r.name) ? ` (${esc(KINDS.find((k) => k.id === kindFromName(r.name)).label)})` : ''}</option>
-                  ${KINDS.map((k) => `<option value="${k.id}" ${r.kind === k.id ? 'selected' : ''}>${esc(k.label)}</option>`).join('')}
-                </select>
+                <label>아이콘 바꾸기</label>
+                <div class="kind-panel"><div class="kind-grid" role="radiogroup" aria-label="역할 아이콘">${ICON_IDS.map((id, ki) => { const cur = r.icon || KIND_TO_ICON[r.kind || kindFromName(r.name) || 'other']; return `<button type="button" class="kind-opt ${cur === id ? 'on' : ''}" role="radio" aria-checked="${cur === id}" aria-label="아이콘 ${ki + 1}" data-k="${id}" style="background:${TILE_BG[ki % 4]}">${roleIcon({ icon: id }, 24)}</button>`; }).join('')}</div></div>
               </div>
               <div><label>한 줄 설명 <span class="tag opt">선택</span></label><input type="text" class="r-desc" maxlength="${DESC_MAX}" value="${esc(r.desc || '')}" placeholder="${esc(exampleDesc(r.kind || kindFromName(r.name) || '') ? `예: ${exampleDesc(r.kind || kindFromName(r.name) || '')}` : '한 줄로 이 역할을 설명해 주세요')}" /></div>
               <div><label>해야 할 일 <span class="tag opt">선택</span></label>
                 ${taskEditorHtml(taskItemsOf(r), r.kind || kindFromName(r.name) || '')}
+              </div>
+              <div><label>예상 일의 양 <span class="tag opt">선택</span></label>
+                <div class="load-seg" role="radiogroup" aria-label="예상 일의 양">${[1, 2, 3].map((n) => `<button type="button" class="load-opt ${r.load === n ? 'on' : ''}" role="radio" aria-checked="${r.load === n}" data-n="${n}">${LOAD_LABEL[n]}</button>`).join('')}</div>
+                <p class="muted small" style="margin-top:6px">대략만 골라도 돼요. 중요도와는 무관하고, 일을 고르게 나눌 때만 써요.</p>
               </div>
             </div>
           </details>
         </div>`,
         )
         .join('')}
-      <div class="row">
-        <button type="button" class="btn line small" id="r-add" ${d.length >= 12 ? 'disabled' : ''}>+ 역할 추가</button>
-        <button type="button" class="btn small" id="r-save">역할 저장</button>
-      </div>
-      <p class="muted small">저장하면 팀원 화면에도 바로 반영돼요. 이미 선호를 낸 팀원은 새로 생긴 역할을 "상관없어요"로 처리해요.</p>
-    </section>`;
+      <button type="button" class="btn big line" id="r-add" ${d.length >= 12 ? 'disabled' : ''}>+ 역할 추가</button>
+    </section>
+    <button type="button" class="btn big" id="r-save" style="margin-top:16px">역할 저장</button>
+    <p class="muted small center" style="margin-top:8px">저장하면 팀원 화면에도 바로 반영돼요. 이미 선호를 낸 팀원은 새로 생긴 역할을 "상관없어요"로 처리해요.</p>`;
 }
 
 /** 편집 칸에 보일 글: 직접 쓰고 있던 글이 있으면 그대로, 없으면 저장된 값 */
@@ -566,10 +573,12 @@ function blankForm() {
 const PREF_LABEL = { want: '하고 싶어요', ok: '상관없어요', avoid: '피하고 싶어요' };
 
 function traitHint(rid, sug) {
-  if (S.touched.has(rid)) return '';
+  const t = S.touched.has(rid);
   const s = sug.suggestions[rid];
-  if (s) return `"${s.labels.join('", "')}" 때문에 "${PREF_LABEL[s.value]}"로 제안했어요. 아니면 바꿔 주세요.`;
-  if (sug.conflicts.includes(rid)) return '고른 성향이 서로 달라서 제안하지 않았어요.';
+  if (s && t && S.form?.prefs?.[rid] !== s.value) return '';
+  if (t && !s) return '';
+  if (s) return `성향 기준 제안: ${PREF_LABEL[s.value]}`;
+  if (sug.conflicts.includes(rid)) return '성향이 엇갈려 제안 없음';
   return '';
 }
 
@@ -630,13 +639,22 @@ const KIND_ICON = {
   lead: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
   present: '<rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M12 16v4M8 20h8M7 11l3-3 3 2 3-3"/>',
   research: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
-  design: '<path d="M12 3a9 9 0 100 18c1.5 0 2-1 1.5-2s0-2 1.5-2h2a3 3 0 003-3A9 9 0 0012 3z"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="7.500" r="1"/><circle cx="16" cy="11" r="1"/>',
+  design: '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
   doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
   schedule: '<rect x="4" y="5" width="16" height="15" rx="2.500"/><path d="M4 10h16M9 3v4M15 3v4"/>',
-  other: '<path d="M12 4v16M4 12h16"/>',
+  other: '<path d="M12 4l2.400 5 5.400.7-4 3.800 1 5.400L12 16.300 7.200 19l1-5.400-4-3.800 5.400-.7z"/>',
 };
+const ICON_PATH = {
+  flag: KIND_ICON.lead, monitor: KIND_ICON.present, search: KIND_ICON.research, pencil: KIND_ICON.design, doc: KIND_ICON.doc, calendar: KIND_ICON.schedule, star: KIND_ICON.other,
+  camera: '<path d="M4 8h3l1.500-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.500"/>',
+  chat: '<path d="M5 5h14v10h-8l-4 4v-4H5z"/><path d="M9 9h6M9 12h4"/>',
+  book: '<path d="M6 4h12v16H8a2 2 0 01-2-2z"/><path d="M6 17h12"/>',
+  code: '<path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/>',
+  megaphone: '<path d="M4 10v4h3l7 4V6l-7 4z"/><path d="M17 9a4 4 0 010 6"/>',
+};
+const KIND_TO_ICON = { lead: 'flag', present: 'monitor', research: 'search', design: 'pencil', doc: 'doc', schedule: 'calendar', other: 'star' };
 const roleIcon = (r, size, color = '#4452C8') =>
-  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="1.700" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_ICON[kindOfRole(r)] || KIND_ICON.other}</svg>`;
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="1.700" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATH[r.icon] || KIND_ICON[kindOfRole(r)] || KIND_ICON.other}</svg>`;
 const PHASE_BG = ['#E4E8FF', '#DDF5EC', '#FFF1C9'];
 
 function prefsCardHtml(roles) {
@@ -658,7 +676,7 @@ function prefsCardHtml(roles) {
       <div class="pf-head"><span>${i + 1}/${total}</span></div>
       <div class="pf-stack">
         <div class="pf-back b2"></div><div class="pf-back b1"></div>
-        <div class="pf-card">
+        <img class="pf-taba" src="/taba-s.png" alt="" width="80" height="80" /><div class="pf-card">
           <div class="tile l" style="background:${TILE_BG[i % 4]}">${roleIcon(r, 46)}</div>
           <h2 class="pf-name">${esc(r.name)}</h2>
           ${r.desc ? `<p class="pf-desc">${esc(r.desc)}</p>` : ''}
@@ -671,9 +689,9 @@ function prefsCardHtml(roles) {
         ${PREF_OPT.map(([v, label, ic, cls]) => `<button type="button" role="radio" aria-checked="${f.prefs[r.id] === v}" class="pf-opt ${cls}${f.prefs[r.id] === v ? ' on' : ''}" data-pref="${v}" data-rid="${esc(r.id)}"><span class="ic">${ic}</span>${label}</button>`).join('')}
       </div>
       <ul class="pf-notes">
-        <li>내 선택은 팀원에게 보이지 않아요</li>
-        <li>넘어가면 “상관없어요”로 처리돼요</li>
-        <li>고른 성향은 저장되지 않아요</li>
+        <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.500 10.900c.7.600 1 1.300 1 2.100h5c0-.8.3-1.500 1-2.100A6 6 0 0012 3z"/></svg>위 문구는 제안일 뿐, 직접 고르면 바뀌어요</li>
+        <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>내 선택은 팀원에게 보이지 않아요</li>
+        <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>넘어가면 “상관없어요”로 처리돼요</li>
       </ul>
       ${f.saved ? '<button type="button" class="pf-skip" data-act="sum">한눈에 보기로 돌아가기 <span>(수정하러 온 경우만)</span></button>' : ''}
       <div class="pf-nav">
@@ -703,7 +721,7 @@ function prefsSummaryHtml(roles) {
   return `
     <section class="pf">
       <div class="pf-head"><span>${total}/${total}</span></div>
-      <h2 class="pf-sum-title">내 선택을 확인해요</h2>
+      <div class="pf-sum-head"><h2 class="pf-sum-title">내 선택을<br>확인해요</h2><img class="pf-sum-taba" src="/taba.png" alt="" width="96" height="96" /></div>
       <div class="pf-rows">
         ${roles
           .map((r, i) => {
@@ -731,9 +749,9 @@ function renderMembers() {
   let action = '';
   if (creator && !assigned()) {
     if (S.busy) {
-      action = '<button type="button" class="btn" id="do-assign" disabled><span class="spinner"></span>배정하는 중…</button>';
+      action = '<button type="button" class="btn big" id="do-assign" disabled><span class="spinner"></span>배정하는 중…</button>';
     } else if (missing === 0) {
-      action = '<button type="button" class="btn" id="do-assign" ' + (submitted === 0 ? 'disabled' : '') + '>배정하기</button>';
+      action = '<button type="button" class="btn big" id="do-assign" ' + (submitted === 0 ? 'disabled' : '') + '>배정하기</button>';
     } else if (S.confirmAssign) {
       action = `<div class="stack">
           <p class="notice">미제출 ${esc(missing)}명은 선호가 없는 상태로 처리돼요(모든 역할을 "상관없어요"로 봐요). 그 팀원이 원하지 않는 역할에 배정될 수 있어요.</p>
@@ -742,26 +760,21 @@ function renderMembers() {
         </div>`;
     } else {
       action = `<div class="stack">
-          <p class="notice">아직 선호를 제출하지 않은 팀원이 ${esc(missing)}명 있어요. 모든 팀원이 제출하면 배정할 수 있어요.</p>
-          <button type="button" class="btn" id="do-assign" disabled>모두 제출하면 배정할 수 있어요 (${esc(submitted)}/${esc(total)})</button>
+          <button type="button" class="btn big" id="do-assign" disabled>모두 입력하면 배정할 수 있어요 (${esc(submitted)}/${esc(total)})</button>
           ${submitted > 0 ? '<button type="button" class="link" id="force-assign" style="align-self:center">그래도 배정하기</button>' : '<p class="muted small">한 명 이상 선호를 저장하면 배정할 수 있어요.</p>'}
         </div>`;
     }
   }
   el.innerHTML = `
-    <section class="card stack">
-      <div>
-        <div class="row between"><h2>참여 현황</h2><span class="muted small">${esc(submitted)}/${esc(total)}명 제출</span></div>
-        <p class="muted">선호를 낸 사람은 초록색이에요. (무엇을 골랐는지는 보이지 않아요.)</p>
+    <div class="members-sec">
+      <div class="row between"><h2 class="sec-h">참여 현황</h2><span class="tg">${esc(submitted)}/${esc(total)}명 입력 완료</span></div>
+      <div class="avs">
+        ${S.members.map((m) => { const mine = m.uid === store.uid; const ck = m.submitted ? '<i class="av-ok"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#1F6B49" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg></i>' : ''; return `<span class="av-item ${m.submitted ? 'done' : ''}">${mine ? `<button type="button" class="av-c av-me" data-av-toggle="me" aria-label="내 캐릭터 바꾸기">${avatarHtml(avatarOf(m))}<i class="av-edit" aria-hidden="true">✎</i>${ck}</button>` : `<span class="av-c">${avatarHtml(avatarOf(m))}${ck}</span>`}<small>${esc(m.nickname)}${mine ? ' (나)' : ''}</small></span>`; }).join('')}
       </div>
-      <div class="members">
-        ${S.members
-          .map((m) => `<span class="member ${m.submitted ? 'done' : ''} ${m.uid === store.uid ? 'me' : ''}">${esc(m.nickname)}${m.uid === store.uid ? ' (나)' : ''}${m.submitted ? ' ✓' : ''}</span>`)
-          .join('')}
-      </div>
+      ${S.avOpen ? `<div class="avp-wrap">${avatarPickerHtml(avatarOf(me()), 'me')}<p class="muted small">언제든 바꿀 수 있어요. 팀원에게 보이는 프로필이에요.</p></div>` : ''}
       ${action}
-      ${!creator && !assigned() ? '<p class="muted small">방장이 배정 버튼을 누르면 결과가 나와요.</p>' : ''}
-    </section>`;
+      ${!creator && !assigned() ? '<p class="muted small center">방장이 배정 버튼을 누르면 결과가 나와요.</p>' : ''}
+    </div>`;
 }
 
 /** 내가 맡은 역할의 설명·할 일. 예전 결과에 내용이 없으면 방의 역할 정보로 채운다. */
@@ -830,9 +843,9 @@ function dutyBodyHtml(role) {
   const doneN = countTasks.filter((t) => isChecked(role.id, t)).length;
   const progLabel = multi && isMine ? `내 몫 ${countTasks.length}개 중 ${doneN}개 완료` : `${doneN}/${countTasks.length} 완료`;
   return `
-    <article class="duty">
+    <article class="duty" style="--rc:${TILE_BG[Math.max(0, (S.result?.roles || []).findIndex((x) => x.id === role.id)) % 4]}">
       <header class="duty-head">
-        <span class="tile l" style="background:#fff">${roleIcon(role, 48)}</span>
+        <span class="tile l" style="background:${TILE_BG[Math.max(0, (S.result?.roles || []).findIndex((x) => x.id === role.id)) % 4]}">${roleIcon(role, 48)}</span>
         <h3>${esc(role.name)}</h3>
         ${d.desc ? `<p>${esc(d.desc)}</p>` : ''}
       </header>
@@ -884,8 +897,8 @@ function renderDuties() {
       <div class="rc-chips" role="tablist">${roles.map((r) => `<button type="button" role="tab" aria-selected="${r.id === sel.id}" class="rc-chip${r.id === sel.id ? ' on' : ''}" data-role="${esc(r.id)}">${esc(r.name)}${mine.has(r.id) ? ' <small>내 역할</small>' : ''}</button>`).join('')}</div>
       <p class="muted small rc-who">맡은 사람: ${names || '아직 없어요'}</p>
       ${S.editGuide && canEditGuide() ? guideFormHtml(sel) : dutyBodyHtml(sel)}
-      ${S.editGuide && canEditGuide() ? '' : '<button type="button" class="btn big line" id="gd-copy" style="margin-top:12px">이 역할 카드 복사하기</button>'}
       ${canEditGuide() && !S.editGuide ? '<button type="button" class="btn big line" id="gd-edit" style="margin-top:12px">이 역할 설명·할 일 수정하기</button>' : ''}
+      ${S.editGuide && canEditGuide() ? '' : '<button type="button" class="btn big line" id="gd-copy" style="margin-top:12px">이 역할 카드 복사하기</button>'}
     </section>
     <button type="button" class="btn big" id="back-card" style="margin-top:16px">돌아가기</button>`;
 }
@@ -908,16 +921,18 @@ function renderMine() {
         !S.priv
           ? '<p class="muted"><span class="spinner"></span>내 결과를 불러오는 중…</p>'
           : duties.length
-          ? duties.map((d) => `<div class="my-hero"><div class="tile l" style="width:96px;height:96px;border-radius:33px;background:#fff">${roleIcon(d, 52)}</div><p class="muted small" style="margin-top:14px">이번에 내가 맡은 역할</p><p class="my-role-name">${esc(d.name)}</p>${d.desc ? `<p class="muted">${esc(d.desc)}</p>` : ''}</div>`).join('')
+          ? duties.length === 1
+            ? `<div class="my-roles">${duties.map((d) => `<div class="my-hero"><div class="tile l" style="width:96px;height:96px;border-radius:33px;background:#fff">${roleIcon(d, 52)}</div><p class="muted small" style="margin-top:14px">이번에 내가 맡은 역할</p><p class="my-role-name">${esc(d.name)}</p>${d.desc ? `<p class="muted">${esc(d.desc)}</p>` : ''}</div>`).join('')}</div>`
+            : `<p class="muted small center" style="margin-top:6px">이번에 내가 맡은 역할 ${duties.length}개</p><div class="my-grid">${duties.map((d, di) => `<div class="my-cell"><span class="tile" style="background:${TILE_BG[di % 4]};width:56px;height:56px;border-radius:20px">${roleIcon(d, 30)}</span><b>${esc(d.name)}</b></div>`).join('')}</div>`
           : '<p class="notice">이번에는 배정된 역할이 없어요. 팀에서 보조 역할을 함께 정해 보세요.</p>'
       }
     </section>
     ${
       S.priv
-        ? `<section class="card"><h2>나의 배정 이유 <span class="badge">나에게만 보여요</span></h2><ul class="lines">${(S.priv.lines || []).map((l) => `<li>${esc(l)}</li>`).join('')}</ul></section>`
+        ? `<section class="card why"><h2>나의 배정 이유 <span class="badge">나에게만 보여요</span></h2><ul class="why-list">${(S.priv.lines || []).map((l) => { const m = String(l).match(/^(.+?) · (.+?) — (.*)$/s); if (!m) return `<li><p>${esc(l)}</p></li>`; const ld = m[1] === '일의 양' ? m[2].match(/([\d.]+)점/) : null; const av = ld ? m[3].match(/([\d.]+)점/) : null; if (ld && av) { const mine = +ld[1]; const avg = +av[1]; const mx = Math.max(mine, avg, 1); return `<li><div class="why-h"><b>일의 양</b></div><div class="bars"><div class="bar-row"><span>내 합계</span><i style="width:${(mine / mx) * 100}%"></i><em>${esc(mine)}점</em></div><div class="bar-row avg"><span>팀원 평균</span><i style="width:${(avg / mx) * 100}%"></i><em>${esc(avg)}점</em></div><p class="bar-note">팀원 평균 = 팀원 1명이 맡은 일의 양 합계를 평균낸 값</p></div></li>`; } const pc = m[2].includes('피하고') ? 'avoid' : m[2].includes('하고 싶') ? 'want' : 'ok'; return `<li><div class="why-h"><b>${esc(m[1])}</b><span class="tg pf-${pc}">${esc(m[2])}</span></div><p>${esc(m[3])}</p></li>`; }).join('')}</ul></section>`
         : ''
     }
-    ${duties.length ? `<button type="button" class="btn big" id="go-card">내 역할 카드 보기 (${esc(duties.map((d) => d.name).join(', '))})</button>` : ''}
+    ${duties.length ? `<button type="button" class="btn big" id="go-card">내 역할 카드 보기</button>` : ''}
     <section class="card stack">
       <div><h2>팀원들에게 한마디 <span class="tag opt">선택</span></h2><p class="muted small">남기면 팀 전체 결과에서 내 이름 아래에 작게 보여요. 배정 전까지의 선호와는 관계없어요.</p></div>
       <input id="msg" type="text" maxlength="${MESSAGE_MAX}" placeholder="예: 부족한 점이 많지만 최선을 다하겠습니다" value="${esc(msgOf(store.uid))}" />
@@ -962,11 +977,11 @@ function renderResult() {
   const person = (m) => {
     const msg = msgOf(m.uid);
     const ci = Math.max(0, S.members.findIndex((x) => x.uid === m.uid));
-    return `<span class="person"><span class="member ${m.uid === myId ? 'me' : ''}"><span class="av" style="background:${OWN_COLORS[ci % OWN_COLORS.length]}">${esc([...m.nickname][0] || '')}</span>${esc(m.nickname)}${m.uid === myId ? ' <span class="me-tag">나</span>' : ''}</span>${msg ? `<small class="msg">${esc(msg)}</small>` : ''}</span>`;
+    return `<span class="person"><span class="member ${m.uid === myId ? 'me' : ''}">${avatarHtml(avOfUid(m.uid), 'av')}${esc(m.nickname)}${m.uid === myId ? ' <span class="me-tag">나</span>' : ''}</span>${msg ? `<small class="msg">${esc(msg)}</small>` : ''}</span>`;
   };
   el.innerHTML = `
-    <section class="card stack">
-      <div class="row between"><h2>팀 전체 결과</h2><span class="badge done">${esc(r.round || 1)}차 배정</span></div>
+    <section class="res-flat stack">
+      <div class="page-head tm"><div><h1 class="page-title">역할이<br>정해졌어요</h1><p class="muted">${esc(S.room?.name || '')} · ${esc(r.round || 1)}차 배정</p></div><span class="tm-chars"><img src="/mata-s.png" alt="" width="70" height="70" /><img src="/taba-s.png" alt="" width="64" height="64" /></span></div>
       <div>
         ${r.roles
           .map(
@@ -984,15 +999,45 @@ function renderResult() {
     </section>
 
     <section class="card">
-      <details><summary style="cursor:pointer;font-weight:700">이 배정은 이런 규칙으로 정해졌어요</summary>
-        <ol class="lines" style="padding-left:20px">${(s.notes || []).map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
-        <p class="muted small">번호가 앞설수록 먼저 지켜요</p>
-        ${s.randomCount > 0 ? `<p class="muted small" style="margin-top:8px">이번 결과에서는 선호와 일의 양 균형이 같은 조합이 여러 개여서, 마지막 단계(무작위)로 정해진 배정이 ${esc(s.randomCount)}건 있어요.</p>` : ''}
-        <p class="muted small" style="margin-top:8px">배정 계산에는 AI를 쓰지 않아요. 같은 입력이면 같은 규칙이 적용돼요.</p>
+      <details class="rules"><summary>이 배정은 이런 규칙으로 정해졌어요</summary>
+        <p class="muted small rules-lead">위에 있는 규칙일수록 먼저 지켜요.</p>
+        <ol class="rules-list">${(s.notes || []).map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
+        ${s.randomCount > 0 ? `<p class="muted small rules-foot">이번에는 선호와 일의 양이 같은 조합이 여러 개여서, 마지막 규칙(무작위)으로 정해진 배정이 ${esc(s.randomCount)}건 있어요.</p>` : ''}
+        <p class="muted small rules-foot">같은 선호를 입력하면 같은 결과가 나와요.</p>
       </details>
     </section>
     ${isCreator() ? (S.confirmReopen ? '<section class="card stack"><p>선호를 수정하고 다시 배정하면 이전 결과는 새 결과로 바뀌어요. 계속할까요?</p><div class="row"><button type="button" class="btn" id="do-reopen-yes">다시 열기</button><button type="button" class="btn line" id="do-reopen-no">취소</button></div></section>' : '<div class="footer"><button type="button" class="btn line" id="do-reopen">선호 수정하고 다시 배정하기</button></div>') : ''}
     <section class="finish"><p>역할이 정해졌어요. 이제 같이 시작해요!</p><button type="button" class="btn big" id="go-start">처음으로</button><p class="muted small">나중에 시작 화면의 "최근 들어간 방"에서 다시 열 수 있어요.</p></section>`;
+}
+
+/* 프로필 캐릭터 고르기 클릭(방 만들기·입장·참여 현황 공통). 앱 시작 때 한 번만 붙인다. */
+function bindAvatarClicks() {
+  // 프로필 캐릭터 고르기 (방 만들기·입장: 임시 선택 / 참여 현황: 내 캐릭터 바로 저장)
+  $app.addEventListener('click', async (e) => {
+    const tg = e.target.closest('[data-av-toggle]');
+    if (tg) {
+      if (tg.dataset.avToggle === 'me') { S.avOpen = !S.avOpen; renderMembers(); return; }
+      const w = $app.querySelector('#avp-draft');
+      if (w) w.hidden = !w.hidden;
+      return;
+    }
+    const opt = e.target.closest('.avp-opt');
+    if (!opt) return;
+    const id = opt.dataset.av;
+    const mode = opt.closest('[data-avp]')?.dataset.avp;
+    if (mode === 'draft') {
+      draftAv = id;
+      $app.querySelectorAll('.avp-opt').forEach((b) => { const on = b.dataset.av === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+      const img = $app.querySelector('.av-btn .avimg');
+      if (img) { img.style.background = AVATAR_BG[id[0]]; img.querySelector('img').src = `/avatars/${id}.png`; img.classList.remove('cm', 'ct'); img.classList.add(`c${id[0].toLowerCase()}`); }
+      $app.querySelector('#avp-draft').hidden = true;
+    } else if (mode === 'me') {
+      S.avOpen = false;
+      saveAvatar(id);
+      try { await store.setAvatar(S.code, id); } catch (err) { console.error(err); toast('캐릭터를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
+      renderMembers();
+    }
+  });
 }
 
 /* ---------------- 이벤트 위임 ---------------- */
@@ -1007,7 +1052,8 @@ function attachDelegates() {
     e.target.closest('button').disabled = true;
     try {
       saveNick(nickname);
-      await store.join(S.code, nickname);
+      saveAvatar(draftAv);
+      await store.join(S.code, nickname, draftAv);
       location.hash = `#/room/${S.code}/prefs`; // 들어오면 바로 선호 입력으로
     } catch (err) {
       console.error(err);
@@ -1031,6 +1077,23 @@ function attachDelegates() {
     if (det.open) S.rolesOpen.add(det.dataset.rid);
     else S.rolesOpen.delete(det.dataset.rid);
   }, true);
+  rolesEl.addEventListener('click', (e) => {
+    const ko = e.target.closest('.kind-opt');
+    const ic = e.target.closest('.r-icon');
+    if (ko || ic) {
+      const blk = (ko || ic).closest('.role-block');
+      const r = S.rolesDraft[+blk.dataset.i];
+      if (ko) r.icon = ko.dataset.k;
+      S.rolesOpen.add(r.id);
+      drawRolesEditor(rolesEl);
+      return;
+    }
+    const lo = e.target.closest('.load-opt');
+    if (!lo) return;
+    const blk = lo.closest('.role-block');
+    S.rolesDraft[+blk.dataset.i].load = +lo.dataset.n;
+    blk.querySelectorAll('.load-opt').forEach((b) => { const on = b === lo; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+  });
   rolesEl.addEventListener('change', (e) => {
     const blk = e.target.closest('.role-block');
     if (!blk) return;
@@ -1351,6 +1414,7 @@ async function boot() {
     $app.innerHTML = `<section class="card"><h2>시작하지 못했어요</h2><p class="muted" style="margin-top:6px">${esc(e.message || e)}</p><p class="muted small" style="margin-top:8px">Firebase 설정(익명 로그인 사용 설정, 설정값)을 확인해 주세요. 주소 끝에 <code>?demo</code>를 붙이면 연습 모드로 열려요.</p></section>`;
     return;
   }
+  bindAvatarClicks();
   window.addEventListener('hashchange', route);
   route();
 }

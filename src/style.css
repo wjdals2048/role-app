@@ -675,3 +675,6 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 .txt-link.sm { font-size: 13px; font-weight: 600; color: #6A70A0; }
 .rules > summary::before { content: '▸ '; }
 .rules[open] > summary::before { content: '▾ '; }
+/* 16차: 필요 인원 선택 — 이름 칸과 같은 알약 */
+.role-edit .r-need { -webkit-appearance: none; appearance: none; width: 92px; flex: none; padding: 15px 30px 15px 20px; border-radius: 999px; color: #1F2340; cursor: pointer;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5L6 6l4.5-4.5' fill='none' stroke='%234452C8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center; background-size: 12px 8px; }

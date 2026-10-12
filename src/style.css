@@ -652,3 +652,26 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 .avp-opt.on { box-shadow: none; }
 .avp-opt { overflow: visible; }
 .avp-opt.on .avimg { box-shadow: 0 0 0 2px #F3F4FF, 0 0 0 5px #4452C8; }
+/* 13차: 팀 결과 — 흰 카드 + 색 아이콘 상자 */
+.role-card.rc-col { background: #fff; box-shadow: 0 8px 24px rgba(60,70,160,.10); }
+.role-card.rc-col .role-link { background: #EEF0FF; box-shadow: none; }
+.role-card.rc-col .tag { background: #F1F2FB; }
+.role-card.rc-col .msg { background: #F3F4FF; }
+
+/* 14차: 복사 버튼 → 글자 링크 */
+.txt-link { font: inherit; font-size: 14px; font-weight: 700; color: #4452C8; background: none; border: 0; box-shadow: none; text-decoration: underline; text-underline-offset: 3px; padding: 12px 8px; min-height: 44px; cursor: pointer; }
+.txt-link:active { opacity: .6; }
+.txt-row { display: flex; justify-content: center; }
+.rt-btns { gap: 0; margin-right: -8px; }
+
+/* 15차: 팀 결과 하단 정리 */
+.copy-grp { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 4px; }
+.copy-grp .muted { margin: -6px 0 0; text-align: center; }
+.rules-sec { margin-top: 4px; }
+.rules > summary { list-style: none; text-align: center; font-size: 14px; color: #5B6190; padding: 10px 0; }
+.rules > summary::-webkit-details-marker { display: none; }
+.rules[open] { background: #fff; border-radius: 22px; padding: 6px 18px 18px; box-shadow: 0 0 0 1.5px #E3E6F8; }
+.finish { margin-top: 12px; }
+.txt-link.sm { font-size: 13px; font-weight: 600; color: #6A70A0; }
+.rules > summary::before { content: '▸ '; }
+.rules[open] > summary::before { content: '▾ '; }

@@ -148,7 +148,7 @@ const CHARS = [
     key: 'T', cls: 'taba', name: '타바', en: 'TABA', hero: '/taba.png', color: '버터 옐로우', hex: '#FFD166',
     say: '언제든 말해줘!',
     intro: '밝고 활발하며, 어색한 순간을 가볍게 풀어주는 분위기 메이커예요.',
-    like: '새로운 경험, 맛있는 간식, 칭찬하기, 친구들과 수다 떨기',
+    like: '새로운 경험, 칭찬하기, 친구들과 수다 떨기',
     dislike: '지루한 분위기, 복잡한 규칙, 혼자만의 부담',
   },
 ];
@@ -322,7 +322,7 @@ function roomShell(code) {
       <div id="room-title" class="room-title"></div>
       <div class="rt-meta" id="s-status"></div>
       <div class="code-box"><span class="code" id="code-text">${esc(code)}</span>
-        <span class="rt-btns"><button type="button" class="pill-btn" id="copy-code">코드</button><button type="button" class="pill-btn" id="copy-link">링크</button></span>
+        <span class="rt-btns"><button type="button" class="txt-link" id="copy-code">코드 복사</button><button type="button" class="txt-link" id="copy-link">링크 복사</button></span>
       </div>
     </section>
     <div id="s-join"></div>
@@ -530,7 +530,7 @@ function drawRolesEditor(el) {
             <button type="button" class="x r-del" aria-label="${esc(r.name || '이 역할')} 삭제">✕</button>
           </div>
           <details class="role-more" data-rid="${esc(r.id)}" ${S.rolesOpen.has(r.id) ? 'open' : ''}>
-            <summary>더보기 (설명 · 할 일 · 일의 양) ${r.desc || taskItemsOf(r).some((t) => t.trim()) ? '<span class="tag ok">작성됨</span>' : '<span class="tag">비어 있음</span>'}</summary>
+            <summary>더보기 (설명 · 할 일 · 일의 양) ${moreBadge(r)}</summary>
             <div class="stack role-more-body">
               <div>
                 <label>아이콘 바꾸기</label>
@@ -556,6 +556,17 @@ function drawRolesEditor(el) {
 }
 
 /** 편집 칸에 보일 글: 직접 쓰고 있던 글이 있으면 그대로, 없으면 저장된 값 */
+function roleFilled(r) {
+  return !!((r.desc || '').trim() || taskItemsOf(r).some((t) => t.trim()));
+}
+function moreBadge(r) {
+  return roleFilled(r) ? '<span class="tag ok">작성됨</span>' : '<span class="tag">비어 있음</span>';
+}
+function syncMoreBadge(blk, r) {
+  const sm = blk.querySelector('.role-more > summary');
+  const old = sm?.querySelector('.tag');
+  if (old) old.outerHTML = moreBadge(r);
+}
 function taskItemsOf(r) {
   return r.taskItems ?? normalizeTasks(r);
 }
@@ -898,7 +909,7 @@ function renderDuties() {
       <p class="muted small rc-who">맡은 사람: ${names || '아직 없어요'}</p>
       ${S.editGuide && canEditGuide() ? guideFormHtml(sel) : dutyBodyHtml(sel)}
       ${canEditGuide() && !S.editGuide ? '<button type="button" class="btn big line" id="gd-edit" style="margin-top:12px">이 역할 설명·할 일 수정하기</button>' : ''}
-      ${S.editGuide && canEditGuide() ? '' : '<button type="button" class="btn big line" id="gd-copy" style="margin-top:12px">이 역할 카드 복사하기</button>'}
+      ${S.editGuide && canEditGuide() ? '' : '<div class="txt-row"><button type="button" class="txt-link" id="gd-copy">이 역할 카드 복사하기</button></div>'}
     </section>
     <button type="button" class="btn big" id="back-card" style="margin-top:16px">돌아가기</button>`;
 }
@@ -986,19 +997,18 @@ function renderResult() {
         ${r.roles
           .map(
             (role, ri) => `
-          <div class="role-card rc-col" style="background:${TILE_BG[ri % 4]}">
-            <div class="role-head"><span class="rc-name"><span class="tile" style="background:#fff;width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
+          <div class="role-card rc-col">
+            <div class="role-head"><span class="rc-name"><span class="tile" style="background:${TILE_BG[ri % 4]};width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
             <div class="names">${role.members.length ? role.members.map(person).join('') : '<span class="muted small">배정된 사람이 없어요</span>'}</div>
           </div>`,
           )
           .join('')}
       </div>
       ${r.unassigned?.length ? `<div class="notice">이번에 역할이 배정되지 않은 팀원: <div class="names" style="margin-top:6px">${r.unassigned.map(person).join('')}</div><p class="small" style="margin-top:6px">팀에서 보조 역할을 함께 정해 보세요.</p></div>` : ''}
-      <button type="button" class="btn big line" id="copy-result">결과 복사하기</button>
-      <p class="muted small">복사에는 역할과 이름만 담겨요. 배정 이유와 선호는 포함되지 않아요.</p>
+      <div class="txt-row"><button type="button" class="txt-link" id="copy-result">결과 복사하기</button></div>
     </section>
 
-    <section class="card">
+    <section class="rules-sec">
       <details class="rules"><summary>이 배정은 이런 규칙으로 정해졌어요</summary>
         <p class="muted small rules-lead">위에 있는 규칙일수록 먼저 지켜요.</p>
         <ol class="rules-list">${(s.notes || []).map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
@@ -1006,8 +1016,8 @@ function renderResult() {
         <p class="muted small rules-foot">같은 선호를 입력하면 같은 결과가 나와요.</p>
       </details>
     </section>
-    ${isCreator() ? (S.confirmReopen ? '<section class="card stack"><p>선호를 수정하고 다시 배정하면 이전 결과는 새 결과로 바뀌어요. 계속할까요?</p><div class="row"><button type="button" class="btn" id="do-reopen-yes">다시 열기</button><button type="button" class="btn line" id="do-reopen-no">취소</button></div></section>' : '<div class="footer"><button type="button" class="btn line" id="do-reopen">선호 수정하고 다시 배정하기</button></div>') : ''}
-    <section class="finish"><p>역할이 정해졌어요. 이제 같이 시작해요!</p><button type="button" class="btn big" id="go-start">처음으로</button><p class="muted small">나중에 시작 화면의 "최근 들어간 방"에서 다시 열 수 있어요.</p></section>`;
+    <section class="finish"><button type="button" class="btn big" id="go-start">처음으로</button><p class="muted small">나중에 시작 화면의 "최근 들어간 방"에서 다시 열 수 있어요.</p></section>
+    ${isCreator() ? (S.confirmReopen ? '<section class="card stack"><p>선호를 수정하고 다시 배정하면 이전 결과는 새 결과로 바뀌어요. 계속할까요?</p><div class="row"><button type="button" class="btn" id="do-reopen-yes">다시 열기</button><button type="button" class="btn line" id="do-reopen-no">취소</button></div></section>' : '<div class="txt-row"><button type="button" class="txt-link sm" id="do-reopen">선호 수정하고 다시 배정하기 (방장만)</button></div>') : ''}`;
 }
 
 /* 프로필 캐릭터 고르기 클릭(방 만들기·입장·참여 현황 공통). 앱 시작 때 한 번만 붙인다. */
@@ -1070,6 +1080,7 @@ function attachDelegates() {
     if (e.target.classList.contains('r-name')) r.name = e.target.value;
     if (e.target.classList.contains('r-desc')) r.desc = e.target.value;
     if (e.target.classList.contains('t-in')) { r.taskItems = [...taskItemsOf(r)]; r.taskItems[+e.target.dataset.ti] = e.target.value; }
+    syncMoreBadge(blk, r);
   });
   rolesEl.addEventListener('toggle', (e) => {
     const det = e.target.closest?.('.role-more');

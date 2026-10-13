@@ -824,3 +824,23 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 }
 
 .draw-cards.n4 .draw-card { width: 40%; }
+
+.dr-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
+.dr-chip { display: inline-flex; align-items: center; gap: 10px; background: #fff; border-radius: 999px; padding: 6px 16px 6px 6px; box-shadow: 0 0 0 1.5px #E3E6F8; }
+.dr-chip b { font-weight: 400; font-size: 17px; }
+.dr-chip.col { flex-direction: column; background: none; box-shadow: none; padding: 0; gap: 8px; }
+.dr-chip.col b { font-size: 15px; line-height: 1.2; }
+.draw-result { display: block; text-align: center; margin: 4px 0 14px; }
+
+/* 26차: 첫 화면 주제 */
+.start-brand p.start-topic { margin-top: 6px; padding: 5px 16px; border-radius: 999px; background: #E8EBFD; color: #4452C8; font-family: 'Jua', sans-serif; font-size: 19px; letter-spacing: -.2px; }
+.start-brand p.start-slogan { margin-top: 10px; font-size: 14px; color: var(--muted); }
+
+.pf-mbti { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 14px; }
+.pf-mbti .pm-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.pf-mbti .pm-label { font-size: 15px; color: var(--ink, #1f2140); margin-right: 2px; }
+.pf-mbti b { padding: 4px 12px; border-radius: 999px; background: #E8EBFD; color: #4452C8; font-family: 'Jua', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: .6px; }
+.pf-mbti small { font-size: 12px; color: var(--muted); }
+
+.pf-mbti { gap: 8px; }
+.pf-mbti .pm-label { margin: 0; font-size: 15px; }

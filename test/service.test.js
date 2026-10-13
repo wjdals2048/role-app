@@ -140,3 +140,9 @@ test('사다리: 모든 출발점이 서로 다른 도착점으로 간다', asyn
     ends.forEach((e) => assert.ok(e >= 0 && e < n));
   }
 });
+
+test('KIND_MBTI: 기타를 뺀 모든 역할 종류에 참고용 MBTI가 있다', async () => {
+  const { KINDS, KIND_MBTI } = await import('../lib/roleGuide.js');
+  for (const k of KINDS.filter((x) => x.id !== 'other')) assert.ok(KIND_MBTI[k.id]?.length >= 1, k.id);
+  for (const v of Object.values(KIND_MBTI)) for (const m of v) assert.match(m, /^[EI][NS][TF][JP]$/);
+});

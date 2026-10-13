@@ -4,7 +4,7 @@ import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNi
 import { AVATAR_IDS, AVATAR_BG, AVATAR_LABEL, validAvatar, defaultAvatar } from '../lib/avatars.js';
 import { relevantTraits, suggestPrefs } from '../lib/traits.js';
 import { makeLadder, walkLadder } from '../lib/ladder.js';
-import { KINDS, ICON_IDS, DESC_MAX, STEP_MAX, STEP_COUNT, kindFromName, kindOfRole, exampleDesc, templateFor } from '../lib/roleGuide.js';
+import { KINDS, KIND_MBTI, ICON_IDS, DESC_MAX, STEP_MAX, STEP_COUNT, kindFromName, kindOfRole, exampleDesc, templateFor } from '../lib/roleGuide.js';
 
 const $app = document.getElementById('app');
 const $toast = document.getElementById('toast');
@@ -127,7 +127,8 @@ function renderStart() {
           <img class="sc-taba" src="/taba.png" alt="" width="380" height="429" />
         </div>
         <h1 class="start-wm"><span class="sr-only">마타바</span>${wordmark('gStart')}</h1>
-        <p>눈치 말고, 마타바에게 말해요</p>
+        <p class="start-topic">팀플 역할 정하기</p>
+        <p class="start-slogan">말하기 어려운 선호, 마타바에 살짝 말해요</p>
       </div>
       <div class="start-actions">
         <button type="button" class="start-card" id="go-create"><span class="sc-ic mata"><img src="/mata-s.png" alt="" /></span>방 만들기</button>
@@ -372,8 +373,8 @@ function roomShell(code) {
 
 const me = () => S.members.find((m) => m.uid === store.uid);
 const isCreator = () => S.room && S.room.creatorUid === store.uid;
-/** 역할 카드(설명·할 일)는 방에 들어온 팀원이면 누구나 고칠 수 있다 */
-const canEditGuide = () => isCreator() || !!me();
+/** 역할 카드(설명·할 일)는 그 역할을 맡은 사람만 고칠 수 있다 */
+const canEditGuide = (roleId) => !!me() && (S.priv?.roleIds || []).includes(roleId);
 const assigned = () => S.room?.status === 'assigned';
 
 async function openRoom(code, view = 'hub') {
@@ -436,8 +437,9 @@ function applyView() {
   const joined = !!me();
   const done = assigned();
   const step = joined && !done && (S.view === 'roles' || S.view === 'prefs') ? S.view : null;
-  const onCard = joined && done && S.view === 'card';
-  const onTeam = done && (!joined || S.view === 'team'); // 방에 아직 안 들어온 사람도 결과는 팀 화면으로 본다
+  const gated = joined && done && !!S.result && !!pendingDraw(S.result, myDuties(S.result)); // 내 결과를 열기 전에는 팀 결과를 가린다
+  const onCard = joined && done && !gated && S.view === 'card';
+  const onTeam = done && !gated && (!joined || S.view === 'team'); // 방에 아직 안 들어온 사람도 결과는 팀 화면으로 본다
   const onMine = joined && done && !onCard && !onTeam;
   show('#room-card', joined && !done && !step);
   show('#s-join', !joined);
@@ -738,6 +740,7 @@ function prefsCardHtml(roles) {
           <button type="button" class="pf-duty" data-act="sheet">▸ 할 일 보기</button>
           ${chips.length ? `<div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}
           ${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}
+          ${KIND_MBTI[kind] ? `<div class="pf-mbti"><span class="pm-label">어울리는 MBTI</span><div class="pm-row">${KIND_MBTI[kind].map((m) => `<b>${m}</b>`).join('')}</div><small>내 선택이 우선이에요, 참고만 해요</small></div>` : ''}
         </div>
       </div>
       <div class="pf-opts" role="radiogroup" aria-label="${esc(r.name)} 선호">
@@ -932,7 +935,7 @@ function dutyBodyHtml(role) {
             ${shown}
             ${multi ? `<p class="muted small">${canTag ? '태그를 누르면 담당을 정할 수 있어요. ' : ''}담당은 같은 역할의 팀원 모두에게 보여요.</p>` : ''}
             ${isMine ? '<p class="muted small">체크는 이 브라우저에만 저장돼요. 다른 팀원에게는 보이지 않아요.</p>' : ''}</div>`
-          : '<p class="duty-empty">아직 이 역할의 할 일을 적지 않았어요.' + (canEditGuide() ? ' 아래 "수정하기"로 적어 주세요.' : ' 팀원이 적으면 여기에 보여요.') + '</p>'
+          : '<p class="duty-empty">아직 이 역할의 할 일을 적지 않았어요.' + (canEditGuide(d.id) ? ' 아래 "수정하기"로 적어 주세요.' : ' 이 역할을 맡은 팀원이 적으면 여기에 보여요.') + '</p>'
       }
     </article>`;
 }
@@ -972,9 +975,9 @@ function renderDuties() {
       <h2 id="h-duties">${mine.has(sel.id) ? '내 역할 카드' : '역할 카드'}</h2>
       <div class="rc-chips" role="tablist">${roles.map((r) => `<button type="button" role="tab" aria-selected="${r.id === sel.id}" class="rc-chip${r.id === sel.id ? ' on' : ''}" data-role="${esc(r.id)}">${esc(r.name)}${mine.has(r.id) ? ' <small>내 역할</small>' : ''}</button>`).join('')}</div>
       <p class="muted small rc-who">맡은 사람: ${names || '아직 없어요'}</p>
-      ${S.editGuide && canEditGuide() ? guideFormHtml(sel) : dutyBodyHtml(sel)}
-      ${canEditGuide() && !S.editGuide ? '<button type="button" class="btn big line" id="gd-edit" style="margin-top:12px">이 역할 설명·할 일 수정하기</button>' : ''}
-      ${S.editGuide && canEditGuide() ? '' : '<div class="txt-row"><button type="button" class="txt-link" id="gd-copy">이 역할 카드 복사하기</button></div>'}
+      ${S.editGuide && canEditGuide(sel.id) ? guideFormHtml(sel) : dutyBodyHtml(sel)}
+      ${canEditGuide(sel.id) && !S.editGuide ? '<button type="button" class="btn big line" id="gd-edit" style="margin-top:12px">이 역할 설명·할 일 수정하기</button>' : ''}
+      ${S.editGuide && canEditGuide(sel.id) ? '' : '<div class="txt-row"><button type="button" class="txt-link" id="gd-copy">이 역할 카드 복사하기</button></div>'}
     </section>
     <button type="button" class="btn big" id="back-card" style="margin-top:16px">돌아가기</button>`;
 }
@@ -1035,17 +1038,19 @@ function whyItemsHtml(lines) {
 
 /* ---------------- 동점(무작위)일 때 결과 확인 연출: 제비뽑기 · 사다리타기 ---------------- */
 // 결과는 서버가 이미 정해 두었다. 여기서는 그 결과를 열어 보는 방식만 고른다.
+// 역할을 여러 개 맡은 사람은 맡은 개수만큼 뽑는다.
 function loadDrawn() {
   try { return new Set(JSON.parse(sessionStorage.getItem('roleapp-drawn') || '[]')); } catch { return new Set(); }
 }
 function saveDrawn() {
   try { sessionStorage.setItem('roleapp-drawn', JSON.stringify([...S.drawn])); } catch { /* 저장이 막혀 있어도 동작에는 문제없다 */ }
 }
-const drawCount = () => Math.min(6, Math.max(3, (S.room?.roles || []).length));
+/** 카드·세로줄 개수: 맡은 역할 수보다 하나 이상 많게 */
+const drawCount = (k = 1) => Math.min(8, Math.max(3, (S.room?.roles || []).length, k + 1));
 
-/** 무작위(동점)로 정해진 내 역할이 있고 아직 확인 전이면 그 역할. 아니면 null */
+/** 내 역할이 있고 아직 결과를 열기 전이면 { duties, key, rnd }. 방장·팀원 모두 같은 단계를 거친다. rnd=무작위로 정해진 역할 포함 */
 function pendingDraw(r, duties) {
-  if (!S.priv || !duties.length) return null;
+  if (!S.priv || !duties.length || duties.length >= 7) return null;
   const key = `${S.code}:${r.round || 1}:${store.uid}`;
   if (S.drawn.has(key)) return null;
   const rnd = new Set();
@@ -1053,77 +1058,103 @@ function pendingDraw(r, duties) {
     const m = String(l).match(/^(.+?) · (.+?) — (.*)$/s);
     if (m && m[3].includes('무작위')) rnd.add(m[1]);
   }
-  const duty = duties.find((x) => rnd.has(x.name));
-  return duty ? { duty, key } : null;
+  return { duties, key, rnd: duties.some((x) => rnd.has(x.name)) };
 }
 
-function ladderSvg(L, start, step, end) {
+const dutyChip = (d) => `<span class="dr-chip"><span class="tile" style="background:${tileBgOf(d)};width:40px;height:40px;border-radius:14px">${roleIcon(d, 22)}</span><b>${esc(d.name)}</b></span>`;
+const drawResultHtml = (duties) => `<div class="draw-result"><p class="muted small">이번에 맡은 역할</p><div class="dr-chips">${duties.map(dutyChip).join('')}</div></div>`;
+
+function ladderSvg(L, starts, step) {
   const xs = (i) => 30 + i * (240 / (L.n - 1));
   const top = 56, bot = 250, ys = (k) => top + (k + 1) * ((bot - top) / (L.rows + 1));
   const lines = Array.from({ length: L.n }, (_, i) => `<line x1="${xs(i)}" y1="${top}" x2="${xs(i)}" y2="${bot}" class="ld-line"/>`).join('');
   const rungs = L.rungs.map((row, k) => row.map((c) => `<line x1="${xs(c)}" y1="${ys(k)}" x2="${xs(c + 1)}" y2="${ys(k)}" class="ld-line"/>`).join('')).join('');
-  const tokens = Array.from({ length: L.n }, (_, i) => `<g class="ld-token${start === i ? ' on' : ''}" ${start == null ? `data-start="${i}" role="button" tabindex="0" aria-label="${i + 1}번 출발"` : ''}><circle cx="${xs(i)}" cy="26" r="18"/><text x="${xs(i)}" y="32" text-anchor="middle">${i + 1}</text></g>`).join('');
-  let path = '';
-  if (start != null) {
-    const w = walkLadder(L, start);
+  const canPick = step === 'start';
+  const tokens = Array.from({ length: L.n }, (_, i) => `<g class="ld-token${starts.includes(i) ? ' on' : ''}" ${canPick && !starts.includes(i) ? `data-start="${i}" role="button" tabindex="0" aria-label="${i + 1}번 출발"` : ''}><circle cx="${xs(i)}" cy="26" r="18"/><text x="${xs(i)}" y="32" text-anchor="middle">${i + 1}</text></g>`).join('');
+  const reached = new Set();
+  const paths = starts.map((st, idx) => {
+    const w = walkLadder(L, st);
+    const running = step === 'run' && idx === starts.length - 1;
+    if (!running) reached.add(w.end);
     const pts = w.points.map(([c, k]) => `${xs(c)},${k < 0 ? top : k >= L.rows ? bot : ys(k)}`).join(' ');
-    path = `<polyline class="ld-path${step === 'run' ? ' run' : ''}" pathLength="1" points="${pts}"/>`;
-  }
-  const ends = Array.from({ length: L.n }, (_, i) => `<g class="ld-end${step === 'done' && i === end ? ' hit' : ''}"><circle cx="${xs(i)}" cy="276" r="15"/><text x="${xs(i)}" y="282" text-anchor="middle">${step === 'done' && i === end ? '✓' : '?'}</text></g>`).join('');
-  return `<svg class="ladder" viewBox="0 0 300 300" role="img" aria-label="사다리타기">${lines}${rungs}${path}${tokens}${ends}</svg>`;
+    return `<polyline class="ld-path${running ? ' run' : ''}" pathLength="1" points="${pts}"/>`;
+  }).join('');
+  const ends = Array.from({ length: L.n }, (_, i) => `<g class="ld-end${reached.has(i) ? ' hit' : ''}"><circle cx="${xs(i)}" cy="276" r="15"/><text x="${xs(i)}" y="282" text-anchor="middle">${reached.has(i) ? '✓' : '?'}</text></g>`).join('');
+  return `<svg class="ladder" viewBox="0 0 300 300" role="img" aria-label="사다리타기">${lines}${rungs}${paths}${tokens}${ends}</svg>`;
 }
 
 function drawHtml(pd, r) {
-  const d = pd.duty;
+  const ds = pd.duties;
+  const k = ds.length;
   const st = S.draw;
-  const n = drawCount();
-  const result = `<div class="draw-result"><span class="tile" style="background:${tileBgOf(d)};width:56px;height:56px;border-radius:20px">${roleIcon(d, 30)}</span><div><p class="muted small">이번에 맡은 역할</p><b>${esc(d.name)}</b></div></div>`;
-  let title = '같은 조건이라 무작위로 정해졌어요';
+  const n = drawCount(k);
+  const prog = (c) => (k > 1 ? ` (${c}/${k})` : '');
+  let title = pd.rnd ? '같은 조건이라 무작위로 정해졌어요' : '내 결과를 열어 볼까요?';
   let body = '';
   if (st.step === 'pick') {
-    body = `<p class="muted">결과는 이미 정해져 있어요. 확인할 방법을 골라 보세요.</p>
+    body = `<p class="muted">${pd.rnd ? '결과는 이미 정해져 있어요. 확인할 방법을 골라 보세요.' : '규칙에 따라 이미 정해졌어요. 열어 볼 방법을 골라 보세요.'}${k > 1 ? `<br>맡은 역할이 ${k}개라서 ${k}번 뽑아요.` : ''}</p>
       <div class="draw-opts">
         <button type="button" class="draw-opt" data-draw="card"><span class="do-ico"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M12 8.500l1 2 2.200.3-1.600 1.500.4 2.200-2-1.100-2 1.100.4-2.200L8.800 10.800 11 10.500z"/></svg></span><b>제비뽑기</b><small>카드를 뒤집어요</small></button>
         <button type="button" class="draw-opt" data-draw="ladder"><span class="do-ico"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18M7 8h10M7 14h10"/></svg></span><b>사다리타기</b><small>출발점을 골라요</small></button>
       </div>
       <button type="button" class="txt-link sm" data-draw="skip">바로 결과 보기</button>`;
   } else if (st.method === 'card') {
-    const done = st.pick != null;
-    title = done ? '뽑았어요!' : '카드를 하나 골라 뒤집어 보세요';
-    body = `<div class="draw-cards n${n}">${Array.from({ length: n }, (_, i) => `<div class="draw-card${done ? (st.pick === i ? ' flip' : ' dim') : ''}" data-card="${i}" role="button" tabindex="${done ? -1 : 0}" aria-label="${i + 1}번 카드"><span class="face back">?</span><span class="face front"><span class="tile" style="background:${tileBgOf(d)};width:44px;height:44px;border-radius:16px">${roleIcon(d, 24)}</span><b>${esc(d.name)}</b></span></div>`).join('')}</div>
-      <div id="draw-after" ${done ? '' : 'hidden'}>${result}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>`;
+    const done = st.picks.length >= k;
+    title = done ? '모두 뽑았어요!' : `카드를 ${k > 1 ? '하나씩 ' : ''}골라 뒤집어 보세요${prog(st.picks.length)}`;
+    body = `<div class="draw-cards n${n}">${Array.from({ length: n }, (_, i) => {
+      const at = st.picks.indexOf(i);
+      const cls = at >= 0 ? ' flip' : done ? ' dim' : '';
+      const face = at >= 0 ? dutyChip(ds[at]).replace('class="dr-chip"', 'class="dr-chip col"') : '';
+      return `<div class="draw-card${cls}" data-card="${i}" role="button" tabindex="${at >= 0 || done ? -1 : 0}" aria-label="${i + 1}번 카드"><span class="face back">?</span><span class="face front">${face}</span></div>`;
+    }).join('')}</div>
+      <div id="draw-after" ${done ? '' : 'hidden'}>${drawResultHtml(ds)}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>`;
   } else {
-    const L = st.ladder;
-    const end = st.start != null ? walkLadder(L, st.start).end : null;
     const done = st.step === 'done';
-    title = done ? '도착했어요!' : st.step === 'run' ? '내려가는 중…' : '출발점을 골라 보세요';
-    body = `${ladderSvg(L, st.start, st.step, end)}
-      ${done ? `<div id="draw-after">${result}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>` : ''}`;
+    title = done ? '모두 도착했어요!' : st.step === 'run' ? '내려가는 중…' : `출발점을 ${k > 1 ? '하나씩 ' : ''}골라 보세요${prog(st.starts.length)}`;
+    body = `${ladderSvg(st.ladder, st.starts, st.step)}
+      ${done ? `<div id="draw-after">${drawResultHtml(ds)}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>` : ''}`;
   }
   return `<section class="draw"><span class="badge">${esc(r.round || 1)}차 배정</span><h2 class="draw-title">${title}</h2>${body}</section>`;
 }
 
 function drawAction(kind) {
   if (kind === 'skip') return finishDraw();
-  if (kind === 'card') S.draw = { step: 'card', method: 'card', pick: null };
-  if (kind === 'ladder') S.draw = { step: 'start', method: 'ladder', ladder: makeLadder(drawCount(), 9), start: null };
+  const pd = S.result ? pendingDraw(S.result, myDuties(S.result)) : null;
+  const k = pd ? pd.duties.length : 1;
+  if (kind === 'card') S.draw = { step: 'card', method: 'card', picks: [] };
+  if (kind === 'ladder') S.draw = { step: 'start', method: 'ladder', ladder: makeLadder(drawCount(k), 9), starts: [] };
   renderMine();
 }
 function pickCard(btn) {
-  if (!S.draw || S.draw.method !== 'card' || S.draw.pick != null) return;
-  S.draw.pick = +btn.dataset.card;
-  const wrap = btn.closest('.draw-cards');
-  wrap.querySelectorAll('.draw-card').forEach((c) => { c.tabIndex = -1; c.classList.add(c === btn ? 'flip' : 'dim'); });
-  const after = $app.querySelector('#draw-after');
-  if (after) { after.hidden = false; if (!REDUCED_MOTION()) setTimeout(() => playAnim(after, 'rise', 700), 350); }
-  const t = $app.querySelector('.draw-title'); if (t) t.textContent = '뽑았어요!';
+  const st = S.draw;
+  const pd = S.result ? pendingDraw(S.result, myDuties(S.result)) : null;
+  if (!st || st.method !== 'card' || !pd) return;
+  const k = pd.duties.length;
+  const i = +btn.dataset.card;
+  if (st.picks.length >= k || st.picks.includes(i)) return;
+  st.picks.push(i);
+  btn.tabIndex = -1;
+  btn.querySelector('.front').innerHTML = dutyChip(pd.duties[st.picks.length - 1]).replace('class="dr-chip"', 'class="dr-chip col"');
+  btn.classList.add('flip');
+  const t = $app.querySelector('.draw-title');
+  if (st.picks.length >= k) {
+    $app.querySelectorAll('.draw-card').forEach((c) => { c.tabIndex = -1; if (!c.classList.contains('flip')) c.classList.add('dim'); });
+    const after = $app.querySelector('#draw-after');
+    if (after) { after.hidden = false; if (!REDUCED_MOTION()) setTimeout(() => playAnim(after, 'rise', 700), 350); }
+    if (t) t.textContent = '모두 뽑았어요!';
+  } else if (t) t.textContent = `카드를 하나씩 골라 뒤집어 보세요 (${st.picks.length}/${k})`;
 }
 function pickStart(i) {
-  if (!S.draw || S.draw.method !== 'ladder' || S.draw.start != null) return;
-  S.draw.start = i;
-  S.draw.step = REDUCED_MOTION() ? 'done' : 'run';
+  const st = S.draw;
+  const pd = S.result ? pendingDraw(S.result, myDuties(S.result)) : null;
+  if (!st || st.method !== 'ladder' || st.step !== 'start' || !pd || st.starts.includes(i)) return;
+  const k = pd.duties.length;
+  st.starts.push(i);
+  const settle = () => { if (S.draw === st) { st.step = st.starts.length >= k ? 'done' : 'start'; renderMine(); } };
+  if (REDUCED_MOTION()) { st.step = st.starts.length >= k ? 'done' : 'start'; renderMine(); return; }
+  st.step = 'run';
   renderMine();
-  if (S.draw.step === 'run') setTimeout(() => { if (S.draw && S.draw.step === 'run') { S.draw.step = 'done'; renderMine(); } }, 2500);
+  setTimeout(settle, 2500);
 }
 function finishDraw() {
   const duties = S.result ? myDuties(S.result) : [];
@@ -1132,6 +1163,7 @@ function finishDraw() {
   S.draw = null;
   S.mineSig = '';
   renderMine();
+  applyView();
 }
 
 function renderMine() {
@@ -1141,7 +1173,7 @@ function renderMine() {
   const duties = myDuties(r);
   const pd = pendingDraw(r, duties);
   if (pd && !S.draw) S.draw = { step: 'pick' };
-  const sig = JSON.stringify([r.round, duties.map((d) => d.name), S.priv?.lines || [], msgOf(store.uid), pd ? [S.draw?.step, S.draw?.method, S.draw?.pick ?? null, S.draw?.start ?? null] : 0]);
+  const sig = JSON.stringify([r.round, duties.map((d) => d.name), S.priv?.lines || [], msgOf(store.uid), pd ? [S.draw?.step, S.draw?.method, S.draw?.picks?.length ?? 0, S.draw?.starts?.length ?? 0] : 0]);
   if (sig === S.mineSig) return; // 입력 중인 글이 지워지지 않게, 바뀐 게 없으면 다시 그리지 않는다
   const firstMine = !S.mineSig;
   S.mineSig = sig;
@@ -1542,6 +1574,7 @@ function attachDelegates() {
     if (chip) { S.cardRole = chip.dataset.role; S.editGuide = false; S.guideItems = null; S.guideDesc = null; renderDuties(); return; }
     if (e.target.closest('#gd-edit')) {
       const sel = currentCardRole();
+      if (!sel || !canEditGuide(sel.id)) return toast('이 역할을 맡은 팀원만 고칠 수 있어요.');
       const g = sel ? guideOf(sel) : { tasks: [], desc: '' };
       S.guideItems = [...g.tasks]; S.guideDesc = g.desc; S.editGuide = true; renderDuties(); return;
     }

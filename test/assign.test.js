@@ -177,3 +177,32 @@ test('규모: 12명 10역할(필요 인원 합 16)이 1초 안에 끝난다', ()
   assert.ok(ms < 1000);
   assert.equal(r.filled, 16);
 });
+
+test('일의 양: 선호가 같으면 일의 양 합계가 고르게 배정된다 (상 2개·하 2개, 2명)', () => {
+  const ctx = {
+    people: ['A', 'B'],
+    roles: [
+      { id: 'h1', name: '팀장', need: 1, load: 3 }, { id: 'h2', name: '발표', need: 1, load: 3 },
+      { id: 'l1', name: '일정', need: 1, load: 1 }, { id: 'l2', name: '정리', need: 1, load: 1 },
+    ],
+    prefs: { A: { h1: O, h2: O, l1: O, l2: O }, B: { h1: O, h2: O, l1: O, l2: O } },
+  };
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const r = assignRoles(ctx, { seed });
+    assert.equal(r.load.A, 4, `seed ${seed}`);
+    assert.equal(r.load.B, 4, `seed ${seed}`);
+  }
+});
+
+test('일의 양이 비어 있으면 중(2)으로 본다', () => {
+  const ctx = { people: ['A'], roles: [{ id: 'x', name: '정리', need: 1 }], prefs: {} };
+  const r = assignRoles(ctx, { seed: 1 });
+  assert.equal(r.load.A, 2);
+});
+
+test('일의 양 설명 줄이 "일의 양 · 내 합계 N점 — 팀 평균 M점" 형식으로 나온다', () => {
+  const ctx = { people: ['A', 'B'], roles: [{ id: 'x', name: '팀장', need: 1, load: 3 }, { id: 'y', name: '일정', need: 1, load: 1 }], prefs: {} };
+  const r = assignRoles(ctx, { seed: 1 });
+  const lines = explainForPerson(r, ctx, 'A');
+  assert.ok(lines.some((l) => /^일의 양 · 내 합계 [\d.]+점 — 팀 평균 [\d.]+점$/.test(l)), JSON.stringify(lines));
+});

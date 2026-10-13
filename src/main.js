@@ -1,6 +1,6 @@
 import './style.css';
 import { createStore } from './store.js';
-import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, normalizeCapacity, CAPACITY_MIN, CAPACITY_MAX } from '../lib/roomService.js';
+import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, normalizeCapacity, CAPACITY_MIN, CAPACITY_MAX , LOAD_LABEL } from '../lib/roomService.js';
 import { AVATAR_IDS, AVATAR_BG, AVATAR_LABEL, validAvatar, defaultAvatar } from '../lib/avatars.js';
 import { relevantTraits, suggestPrefs } from '../lib/traits.js';
 import { makeLadder, walkLadder } from '../lib/ladder.js';
@@ -201,9 +201,19 @@ function renderJoinCode() {
     </section>`;
   $app.querySelector('#back').addEventListener('click', () => (location.hash = '#/'));
   const input = $app.querySelector('#join-code');
-  const go = () => {
+  let checking = false;
+  const go = async () => {
     const code = input.value.trim().toUpperCase();
     if (!/^[A-Z2-9]{6}$/.test(code)) return toast('방 코드는 영문 대문자와 숫자 6자리예요.');
+    if (checking) return;
+    checking = true;
+    const btn = $app.querySelector('#join');
+    if (btn) btn.disabled = true;
+    let room = true;
+    try { room = store?.getRoom ? await store.getRoom(code) : true; } catch { room = true; } // 확인이 안 되면 기존처럼 다음 화면에서 안내
+    checking = false;
+    if (btn) btn.disabled = false;
+    if (!room) { toast('이 코드의 방을 찾을 수 없어요. 코드를 다시 확인해 주세요.'); input.focus(); input.select(); return; }
     location.hash = `#/room/${code}`;
   };
   $app.querySelector('#join').addEventListener('click', go);
@@ -234,7 +244,7 @@ function renderCreate() {
       </div>
       <div>
         <label for="cap">팀원 수 <span class="tag req">나 포함</span></label>
-        <div class="cap-row"><select id="cap" class="cap-select" aria-label="팀원 수">${Array.from({ length: CAPACITY_MAX - CAPACITY_MIN + 1 }, (_, i) => CAPACITY_MIN + i).map((n) => `<option value="${n}" ${home.capacity === n ? 'selected' : ''}>${n}명</option>`).join('')}</select><span class="muted small">정해진 인원이 다 들어오면 방이 닫혀요</span></div>
+        <div class="cap-row"><select id="cap" class="cap-select" aria-label="팀원 수">${Array.from({ length: CAPACITY_MAX - CAPACITY_MIN + 1 }, (_, i) => CAPACITY_MIN + i).map((n) => `<option value="${n}" ${home.capacity === n ? 'selected' : ''}>${n}명</option>`).join('')}</select><span class="muted small">이 인원이 차면 더는 입장할 수 없어요</span></div>
       </div>
       <div>
         <label>필요한 역할 <span class="tag req">1개 이상</span></label>
@@ -379,7 +389,7 @@ const assigned = () => S.room?.status === 'assigned';
 
 async function openRoom(code, view = 'hub') {
   cleanup();
-  S = { code, view, room: null, members: [], result: null, priv: null, rolesDraft: null, rolesOpen: new Set(), rolesSig: '', prefsSig: '', form: null, cardRole: null, editGuide: false, confirmReopen: false, pIdx: null, sheet: false, traits: new Set(), touched: new Set(), prefsLoaded: false, busy: false, confirmAssign: false, confirmSlots: false, capEdit: false, draw: null, drawn: loadDrawn(), loaded: false };
+  S = { code, view, room: null, members: [], result: null, priv: null, rolesDraft: null, rolesOpen: new Set(), rolesSig: '', prefsSig: '', form: null, cardRole: null, editGuide: false, confirmReopen: false, pIdx: null, editOne: false, sheet: false, traits: new Set(), touched: new Set(), prefsLoaded: false, busy: false, confirmAssign: false, confirmSlots: false, capEdit: false, draw: null, drawn: loadDrawn(), loaded: false };
   roomShell(code);
   const status = $app.querySelector('#s-status');
   status.innerHTML = '<span class="muted"><span class="spinner"></span>방을 불러오는 중…</span>';
@@ -533,7 +543,7 @@ function renderJoin() {
     <div class="avp-wrap" id="avp-draft" hidden>${avatarPickerHtml(draftAv, 'draft')}</div>
     ${assigned() ? '<p class="notice">이미 배정이 끝난 방이에요. 지금 들어가도 이번 배정에는 포함되지 않아요.</p>' : ''}
     <button type="button" class="btn big" id="do-join">들어가기</button>
-    <div class="jn-roles"><p class="muted">이번에 정할 역할</p><div class="chips">${jroles.map((r) => `<span class="chip">${roleIcon(r, 15)}${esc(r.name)} ${esc(r.need)}명</span>`).join('')}</div></div>`;
+    <div class="jn-roles"><p class="muted">이번에 정할 역할</p><div class="chips">${jroles.map((r) => `<span class="chip">${roleIcon(r, 15)}${esc(r.name)} ${esc(r.need)}명 · 일의 양 ${esc(LOAD_LABEL[r.load] || '중')}</span>`).join('')}</div></div>`;
 }
 
 function renderRoles() {
@@ -551,7 +561,7 @@ function renderRoles() {
       <section class="card">
         <h2>이번에 정할 역할</h2>
         <div class="stack" style="margin-top:10px">
-          ${roles.map((r) => `<div><b>${esc(r.name)}</b> <span class="tag">${esc(r.need)}명</span>${r.desc ? `<p class="role-desc">${esc(r.desc)}</p>` : ''}</div>`).join('')}
+          ${roles.map((r) => `<div><b>${esc(r.name)}</b> <span class="tag">${esc(r.need)}명</span><span class="tag">일의 양 ${esc(LOAD_LABEL[r.load] || '중')}</span>${r.desc ? `<p class="role-desc">${esc(r.desc)}</p>` : ''}</div>`).join('')}
         </div>
         ${isCreator() ? '' : '<p class="muted small" style="margin-top:10px">역할은 방장이 정해요.</p>'}
       </section>`;
@@ -573,6 +583,7 @@ function drawRolesEditor(el) {
             <select class="r-need" aria-label="필요 인원">${[1, 2, 3].map((n) => `<option value="${n}" ${r.need === n ? 'selected' : ''}>${n}명</option>`).join('')}</select>
             <button type="button" class="x r-del" aria-label="${esc(r.name || '이 역할')} 삭제">✕</button>
           </div>
+          <div class="role-load"><label>일의 양 <span class="muted small">(대략적인 무게)</span></label><select class="r-load" aria-label="일의 양">${[1, 2, 3].map((n) => `<option value="${n}" ${(r.load || 2) === n ? 'selected' : ''}>${LOAD_LABEL[n]}</option>`).join('')}</select></div>
           <details class="role-more" data-rid="${esc(r.id)}" ${S.rolesOpen.has(r.id) ? 'open' : ''}>
             <summary>더보기 (설명 · 할 일) ${moreBadge(r)}</summary>
             <div class="stack role-more-body">
@@ -671,7 +682,7 @@ async function renderPrefs() {
   if (!S.form) return;
   const roles = S.room.roles;
   for (const r of roles) if (!(r.id in S.form.prefs)) S.form.prefs[r.id] = 'ok';
-  const sig = JSON.stringify([roles, S.form.saved === true, S.pIdx, S.sheet, [...S.traits], S.form.prefs, S.form.randomConsent]);
+  const sig = JSON.stringify([roles, S.form.saved === true, S.pIdx, S.editOne, S.sheet, [...S.traits], S.form.prefs, S.form.randomConsent]);
   if (sig === S.prefsSig) return;
   S.prefsSig = sig;
   S.traits = new Set([...S.traits].filter((id) => relevantTraits(roles).some((t) => t.id === id))); // 없어진 역할의 칩은 해제
@@ -737,6 +748,7 @@ function prefsCardHtml(roles) {
           <div class="tile l" style="background:${tileBgOf(r)}">${roleIcon(r, 46)}</div>
           <h2 class="pf-name">${esc(r.name)}</h2>
           ${r.desc ? `<p class="pf-desc">${esc(r.desc)}</p>` : ''}
+          <p class="pf-load">일의 양 <b>${esc(LOAD_LABEL[r.load] || '중')}</b></p>
           <button type="button" class="pf-duty" data-act="sheet">▸ 할 일 보기</button>
           ${chips.length ? `<div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}
           ${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}
@@ -751,11 +763,13 @@ function prefsCardHtml(roles) {
         <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>내 선택은 팀원에게 보이지 않아요</li>
         <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>넘어가면 “상관없어요”로 처리돼요</li>
       </ul>
-      ${f.saved ? '<button type="button" class="pf-skip" data-act="sum">한눈에 보기로 돌아가기 <span>(수정하러 온 경우만)</span></button>' : ''}
+      ${S.editOne
+        ? '<div class="pf-nav"><button type="button" class="btn big" data-act="sum">수정 완료</button></div>'
+        : `${f.saved ? '<button type="button" class="pf-skip" data-act="sum">한눈에 보기로 돌아가기</button>' : ''}
       <div class="pf-nav">
         ${i > 0 ? '<button type="button" class="btn big line" data-act="prev">◂ 이전</button>' : ''}
         <button type="button" class="btn big" data-act="next" style="flex:2">${last ? '선택 확인하기 ▸' : '다음 역할 ▸'}</button>
-      </div>
+      </div>`}
     </section>
     ${S.sheet ? dutySheetHtml(r, i) : ''}`;
 }
@@ -1000,7 +1014,7 @@ function whyInfo(pf, body) {
     };
   }
   if (body.includes('원하는 대로')) return { short: '원하는 대로 배정됐어요', detail: '하고 싶은 사람이 자리 수를 넘지 않았어요.' };
-  if (body.includes('무작위')) return { short: '랜덤으로 지정됐어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었고, ` : ''}선호 만족이 같은 조합이 여러 개여서 역할 수 균형과 무작위로 정했어요.` };
+  if (body.includes('무작위')) return { short: '랜덤으로 지정됐어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었고, ` : ''}선호 만족이 같은 조합이 여러 개여서 일의 양 균형과 무작위로 정했어요.` };
   if (body.includes('가장 크게 만족')) return { short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `하고 싶은 사람이 ${n || '여러'}명이어서, 팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐어요.` };
   if (body.includes('같은 규칙을 적용')) return { short: '팀 전체 규칙에 따라 배정됐어요', detail: '모두에게 같은 순서로 규칙을 적용했어요. 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화.' };
   return null;
@@ -1021,7 +1035,7 @@ function whyItemsHtml(lines) {
     if (m[1] === '일의 양') {
       const mine = m[2].match(/([\d.]+)점/);
       const avg = m[3].match(/([\d.]+)점/);
-      if (false && mine && avg) out.push(`<li class="why-load"><div class="why-h"><b>일의 양</b></div>${loadBarHtml(+mine[1], +avg[1])}<details class="why-more"><summary>평균이 뭐예요?</summary><p>팀원 1명이 맡은 일의 양 합계를 평균낸 값이에요. 가운데 선이 그 평균이에요.</p></details></li>`);
+      if (mine && avg) out.push(`<li class="why-load"><div class="why-h"><b>일의 양</b></div>${loadBarHtml(+mine[1], +avg[1])}<details class="why-more"><summary>평균이 뭐예요?</summary><p>팀원 1명이 맡은 일의 양 합계를 평균낸 값이에요. 가운데 선이 그 평균이에요.</p></details></li>`);
       continue;
     }
     const pc = m[2].includes('피하고') ? 'avoid' : m[2].includes('하고 싶') ? 'want' : 'ok';
@@ -1048,7 +1062,8 @@ function saveDrawn() {
 /** 카드·세로줄 개수: 맡은 역할 수보다 하나 이상 많게 */
 const drawCount = (k = 1) => Math.min(8, Math.max(3, (S.room?.roles || []).length, k + 1));
 
-/** 내 역할이 있고 아직 결과를 열기 전이면 { duties, key, rnd }. 방장·팀원 모두 같은 단계를 거친다. rnd=무작위로 정해진 역할 포함 */
+/** 동점(무작위)으로 정해진 내 역할이 있고 아직 확인 전이면 { duties(내 역할 전부), names(무작위로 정해진 역할), key }. 아니면 null.
+ *  무작위로 정해진 사람만 뽑기를 한다. 나머지는 바로 팀 결과를 본다. 방 전체가 같은 한 가지 방식(DRAW_GAME)을 쓴다. */
 function pendingDraw(r, duties) {
   if (!S.priv || !duties.length || duties.length >= 7) return null;
   const key = `${S.code}:${r.round || 1}:${store.uid}`;
@@ -1058,8 +1073,12 @@ function pendingDraw(r, duties) {
     const m = String(l).match(/^(.+?) · (.+?) — (.*)$/s);
     if (m && m[3].includes('무작위')) rnd.add(m[1]);
   }
-  return { duties, key, rnd: duties.some((x) => rnd.has(x.name)) };
+  const names = duties.filter((x) => rnd.has(x.name)).map((x) => x.name);
+  return names.length ? { duties, names, key } : null;
 }
+/** 모두에게 같은 방식으로 보여 주기 위해 하나만 쓴다. 'card'(제비뽑기) 또는 'ladder'(사다리타기) */
+const DRAW_GAME = 'card';
+const initDraw = (k) => (DRAW_GAME === 'ladder' ? { step: 'start', method: 'ladder', ladder: makeLadder(drawCount(k), 9), starts: [] } : { step: 'card', method: 'card', picks: [] });
 
 const dutyChip = (d) => `<span class="dr-chip"><span class="tile" style="background:${tileBgOf(d)};width:40px;height:40px;border-radius:14px">${roleIcon(d, 22)}</span><b>${esc(d.name)}</b></span>`;
 const drawResultHtml = (duties) => `<div class="draw-result"><p class="muted small">이번에 맡은 역할</p><div class="dr-chips">${duties.map(dutyChip).join('')}</div></div>`;
@@ -1089,30 +1108,28 @@ function drawHtml(pd, r) {
   const st = S.draw;
   const n = drawCount(k);
   const prog = (c) => (k > 1 ? ` (${c}/${k})` : '');
-  let title = pd.rnd ? '같은 조건이라 무작위로 정해졌어요' : '내 결과를 열어 볼까요?';
+  const nm = pd.names.map((x) => `‘${esc(x)}’`).join(', ');
+  const reasonHtml = `<p class="muted draw-why">${nm} 역할은 선호가 같은 사람이 여러 명이라, 마지막 규칙(무작위)으로 정했어요.<br>결과는 이미 정해져 있고, ${DRAW_GAME === 'ladder' ? '사다리를 타며' : '카드를 뒤집어'} 확인해요.${k > 1 ? `<br>맡은 역할이 ${k}개라서 ${k}번 해요.` : ''}</p>`;
+  let title = '같은 조건이라 무작위로 정해졌어요';
   let body = '';
   if (st.step === 'pick') {
-    body = `<p class="muted">${pd.rnd ? '결과는 이미 정해져 있어요. 확인할 방법을 골라 보세요.' : '규칙에 따라 이미 정해졌어요. 열어 볼 방법을 골라 보세요.'}${k > 1 ? `<br>맡은 역할이 ${k}개라서 ${k}번 뽑아요.` : ''}</p>
-      <div class="draw-opts">
-        <button type="button" class="draw-opt" data-draw="card"><span class="do-ico"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M12 8.500l1 2 2.200.3-1.600 1.500.4 2.200-2-1.100-2 1.100.4-2.200L8.800 10.800 11 10.500z"/></svg></span><b>제비뽑기</b><small>카드를 뒤집어요</small></button>
-        <button type="button" class="draw-opt" data-draw="ladder"><span class="do-ico"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18M7 8h10M7 14h10"/></svg></span><b>사다리타기</b><small>출발점을 골라요</small></button>
-      </div>
-      <button type="button" class="txt-link sm" data-draw="skip">바로 결과 보기</button>`;
+    body = '';
   } else if (st.method === 'card') {
     const done = st.picks.length >= k;
     title = done ? '모두 뽑았어요!' : `카드를 ${k > 1 ? '하나씩 ' : ''}골라 뒤집어 보세요${prog(st.picks.length)}`;
-    body = `<div class="draw-cards n${n}">${Array.from({ length: n }, (_, i) => {
+    body = `${reasonHtml}<div class="draw-cards n${n}">${Array.from({ length: n }, (_, i) => {
       const at = st.picks.indexOf(i);
       const cls = at >= 0 ? ' flip' : done ? ' dim' : '';
       const face = at >= 0 ? dutyChip(ds[at]).replace('class="dr-chip"', 'class="dr-chip col"') : '';
       return `<div class="draw-card${cls}" data-card="${i}" role="button" tabindex="${at >= 0 || done ? -1 : 0}" aria-label="${i + 1}번 카드"><span class="face back">?</span><span class="face front">${face}</span></div>`;
     }).join('')}</div>
-      <div id="draw-after" ${done ? '' : 'hidden'}>${drawResultHtml(ds)}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>`;
+      <div id="draw-after" ${done ? '' : 'hidden'}>${drawResultHtml(ds)}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>
+      ${done ? '' : '<button type="button" class="txt-link sm" data-draw="skip">바로 결과 보기</button>'}`;
   } else {
     const done = st.step === 'done';
     title = done ? '모두 도착했어요!' : st.step === 'run' ? '내려가는 중…' : `출발점을 ${k > 1 ? '하나씩 ' : ''}골라 보세요${prog(st.starts.length)}`;
-    body = `${ladderSvg(st.ladder, st.starts, st.step)}
-      ${done ? `<div id="draw-after">${drawResultHtml(ds)}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>` : ''}`;
+    body = `${reasonHtml}${ladderSvg(st.ladder, st.starts, st.step)}
+      ${done ? `<div id="draw-after">${drawResultHtml(ds)}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>` : st.step === 'run' ? '' : '<button type="button" class="txt-link sm" data-draw="skip">바로 결과 보기</button>'}`;
   }
   return `<section class="draw"><span class="badge">${esc(r.round || 1)}차 배정</span><h2 class="draw-title">${title}</h2>${body}</section>`;
 }
@@ -1139,6 +1156,7 @@ function pickCard(btn) {
   const t = $app.querySelector('.draw-title');
   if (st.picks.length >= k) {
     $app.querySelectorAll('.draw-card').forEach((c) => { c.tabIndex = -1; if (!c.classList.contains('flip')) c.classList.add('dim'); });
+    $app.querySelector('[data-draw=skip]')?.remove();
     const after = $app.querySelector('#draw-after');
     if (after) { after.hidden = false; if (!REDUCED_MOTION()) setTimeout(() => playAnim(after, 'rise', 700), 350); }
     if (t) t.textContent = '모두 뽑았어요!';
@@ -1172,7 +1190,7 @@ function renderMine() {
   if (!me() || !assigned() || !r) { el.innerHTML = ''; S.mineSig = ''; return; }
   const duties = myDuties(r);
   const pd = pendingDraw(r, duties);
-  if (pd && !S.draw) S.draw = { step: 'pick' };
+  if (pd && !S.draw) S.draw = initDraw(pd.duties.length);
   const sig = JSON.stringify([r.round, duties.map((d) => d.name), S.priv?.lines || [], msgOf(store.uid), pd ? [S.draw?.step, S.draw?.method, S.draw?.picks?.length ?? 0, S.draw?.starts?.length ?? 0] : 0]);
   if (sig === S.mineSig) return; // 입력 중인 글이 지워지지 않게, 바뀐 게 없으면 다시 그리지 않는다
   const firstMine = !S.mineSig;
@@ -1252,7 +1270,7 @@ function renderResult() {
           .map(
             (role, ri) => `
           <div class="role-card rc-col">
-            <div class="role-head"><span class="rc-name"><span class="tile" style="background:${tileBgOf(role)};width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
+            <div class="role-head"><span class="rc-name"><span class="tile" style="background:${tileBgOf(role)};width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span><span class="tag">일의 양 ${esc(LOAD_LABEL[role.load] || '중')}</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
             <div class="names">${role.members.length ? role.members.map(person).join('') : '<span class="muted small">배정된 사람이 없어요</span>'}</div>
           </div>`,
           )
@@ -1461,8 +1479,8 @@ function attachDelegates() {
       const apply = () => {
         if (a === 'next') S.pIdx = Math.min(S.pIdx + 1, n);
         else if (a === 'prev') S.pIdx = Math.max(S.pIdx - 1, 0);
-        else if (a === 'sum') S.pIdx = n;
-        else if (a === 'edit') S.pIdx = Number(act.dataset.i);
+        else if (a === 'sum') { S.pIdx = n; S.editOne = false; }
+        else if (a === 'edit') { S.pIdx = Number(act.dataset.i); S.editOne = true; }
         else if (a === 'sheet') S.sheet = true;
         else if (a === 'close') S.sheet = false;
         renderPrefs();
@@ -1495,6 +1513,7 @@ function attachDelegates() {
       S.touched = new Set(S.room.roles.map((r) => r.id)); // 저장한 선택은 확정. 성향 칩은 저장하지 않으므로 닫는다.
       S.traits = new Set();
       S.pIdx = null;
+      S.editOne = false;
       S.prefsSig = '';
       renderPrefs();
       toast('선호를 저장했어요.');

@@ -844,3 +844,12 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 
 .pf-mbti { gap: 8px; }
 .pf-mbti .pm-label { margin: 0; font-size: 15px; }
+
+.draw-why { font-size: 14px; line-height: 1.55; text-align: center; margin: 4px 0 14px; }
+
+/* 27차: 일의 양(상·중·하) */
+.role-load { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 2px; padding: 0 2px; }
+.role-load label { font-size: 14px; margin: 0; }
+.role-load select { width: 76px; }
+.pf-load { margin-top: 8px; font-size: 14px; color: var(--muted); text-align: center; }
+.pf-load b { margin-left: 4px; padding: 2px 10px; border-radius: 999px; background: #FFF3D6; color: #8A5A00; font-weight: 400; font-family: 'Jua', sans-serif; }

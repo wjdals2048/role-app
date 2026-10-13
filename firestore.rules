@@ -15,16 +15,18 @@ service cloud.firestore {
         && request.resource.data.status == 'collecting'
         && request.resource.data.roles is list
         && request.resource.data.roles.size() <= 12
-        && request.resource.data.keys().hasOnly(['creatorUid', 'status', 'roles', 'createdAt', 'name'])
-        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 20));
+        && request.resource.data.keys().hasOnly(['creatorUid', 'status', 'roles', 'createdAt', 'name', 'capacity'])
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 20))
+        && (!('capacity' in request.resource.data) || (request.resource.data.capacity is int && request.resource.data.capacity >= 1 && request.resource.data.capacity <= 12));
 
-      // 방장만, 모으는 중일 때만, roles만 바꿀 수 있다 (status 변경은 서버 함수만)
+      // 방장만, 모으는 중일 때만, roles와 팀원 수(capacity)만 바꿀 수 있다 (status 변경은 서버 함수만)
       allow update: if signedIn()
         && resource.data.creatorUid == request.auth.uid
         && resource.data.status == 'collecting'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles', 'capacity'])
         && request.resource.data.roles is list
-        && request.resource.data.roles.size() <= 12;
+        && request.resource.data.roles.size() <= 12
+        && (!('capacity' in request.resource.data) || (request.resource.data.capacity is int && request.resource.data.capacity >= 1 && request.resource.data.capacity <= 12));
 
       // 방장과 방에 들어온 팀원은 배정 뒤에도 역할의 설명·할 일(guides)만 고칠 수 있다 (배정 결과에는 영향 없음)
       allow update: if signedIn()

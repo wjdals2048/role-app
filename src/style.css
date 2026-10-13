@@ -768,3 +768,59 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 .role-card.rc-col .msg > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-card.rc-col .msg.open > span { white-space: normal; overflow: visible; }
 .role-card.rc-col .person:has(.msg.open) { align-items: flex-start; }
+
+/* 24차: 팀원 수 */
+.cap-row { display: flex; align-items: center; gap: 12px; }
+.cap-row .muted { flex: 1; }
+.cap-select { -webkit-appearance: none; appearance: none; width: 104px; flex: none; padding: 15px 34px 15px 20px; border-radius: 999px; color: #1F2340; cursor: pointer;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5L6 6l4.5-4.5' fill='none' stroke='%234452C8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 16px center; background-size: 12px 8px; }
+.cap-hint { margin-top: 10px; }
+.cap-edit { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; }
+.cap-edit .btn { padding: 13px 22px; }
+.av-item.wait .av-c { background: transparent; box-shadow: none; border: 2px dashed #C5CCF7; }
+.av-item.wait small { color: #8A90B8; }
+
+/* 25차: 동점(무작위)일 때 결과 확인 — 제비뽑기 · 사다리타기 */
+.draw { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; padding: 8px 0 0; }
+.draw-title { font-size: 24px; margin: 4px 0 0; }
+.draw-opts { display: flex; gap: 12px; width: 100%; }
+.draw-opt { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 10px 18px; border-radius: 26px; border: 0; background: #fff; box-shadow: 0 0 0 1.5px #E3E6F8; font: inherit; color: var(--ink); cursor: pointer; }
+.draw-opt b { font-size: 18px; font-weight: 400; }
+.draw-opt small { font-size: 13px; color: #6B7190; }
+.draw-opt .do-ico { width: 56px; height: 56px; border-radius: 20px; background: #DDE1FF; display: inline-flex; align-items: center; justify-content: center; }
+.draw-opt:active { transform: scale(.97); }
+.draw-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; width: 100%; perspective: 800px; }
+.draw-card { position: relative; width: 28%; min-width: 92px; aspect-ratio: 3/4; border: 0; padding: 0; background: none; cursor: pointer; transform-style: preserve-3d; font: inherit; }
+.draw-card .face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-radius: 22px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.draw-card .back { background: #DDE1FF; box-shadow: 0 0 0 2px #C5CCF7 inset; font-size: 40px; color: #4452C8; }
+.draw-card .front { background: #fff; box-shadow: 0 0 0 3px #4452C8 inset; transform: rotateY(180deg); padding: 8px; font-size: 15px; }
+.draw-card .front b { font-weight: 400; line-height: 1.2; }
+.draw-card.flip { transform: rotateY(180deg); }
+.draw-card.dim { opacity: .45; }
+.draw-card:not(.flip):not(.dim):active { transform: scale(.96); }
+.draw-result { display: flex; align-items: center; justify-content: center; gap: 14px; text-align: left; margin: 4px 0 14px; }
+.draw-result b { font-size: 26px; font-weight: 400; }
+.draw-result p { margin: 0; }
+#draw-after { width: 100%; display: flex; flex-direction: column; align-items: center; }
+#draw-after[hidden] { display: none; }
+.ladder { width: 100%; max-width: 340px; height: auto; }
+.ld-line { stroke: #C5CCF7; stroke-width: 4; stroke-linecap: round; }
+.ld-token circle { fill: #fff; stroke: #C5CCF7; stroke-width: 2.5; }
+.ld-token text { font-size: 17px; fill: #4452C8; pointer-events: none; }
+.ld-token[data-start] { cursor: pointer; }
+.ld-token.on circle { fill: #4452C8; stroke: #4452C8; }
+.ld-token.on text { fill: #fff; }
+.ld-path { fill: none; stroke: #4452C8; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.ld-end circle { fill: #DDE1FF; stroke: #C5CCF7; stroke-width: 2; }
+.ld-end text { font-size: 16px; fill: #4452C8; }
+.ld-end.hit circle { fill: #5DCBA0; stroke: #fff; stroke-width: 3; }
+.ld-end.hit text { fill: #fff; }
+@media (prefers-reduced-motion: no-preference) {
+  .draw-card { transition: transform .6s cubic-bezier(.34,1.2,.64,1), opacity .4s; }
+  .draw-card:not(.flip):not(.dim):hover { transform: translateY(-4px); }
+  .ld-path.run { stroke-dashoffset: 1; animation: ldRun 2.2s linear forwards; }
+  @keyframes ldRun { to { stroke-dashoffset: 0; } }
+  .ld-end.hit circle { animation: pop .5s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
+}
+
+.draw-cards.n4 .draw-card { width: 40%; }

@@ -120,3 +120,23 @@ test('normalizeMessage: 40자 제한, 공백·제어문자 정리', async () => 
   assert.equal(normalizeMessage('가'.repeat(60)).length, 40);
   assert.equal(normalizeMessage(undefined), '');
 });
+
+test('팀원 수: 1~12로 맞추고 숫자가 아니면 null', async () => {
+  const { normalizeCapacity } = await import('../lib/roomService.js');
+  assert.equal(normalizeCapacity('4'), 4);
+  assert.equal(normalizeCapacity(0), 1);
+  assert.equal(normalizeCapacity(99), 12);
+  assert.equal(normalizeCapacity('abc'), null);
+  assert.equal(normalizeCapacity(undefined), null);
+});
+
+test('사다리: 모든 출발점이 서로 다른 도착점으로 간다', async () => {
+  const { makeLadder, walkLadder } = await import('../lib/ladder.js');
+  for (let t = 0; t < 200; t++) {
+    const n = 3 + (t % 4);
+    const L = makeLadder(n, 9);
+    const ends = Array.from({ length: n }, (_, s) => walkLadder(L, s).end);
+    assert.equal(new Set(ends).size, n);
+    ends.forEach((e) => assert.ok(e >= 0 && e < n));
+  }
+});

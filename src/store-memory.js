@@ -34,13 +34,13 @@ export function createMemoryStore() {
     get uid() {
       return uid;
     },
-    async createRoom({ roles, nickname, name, avatar }) {
+    async createRoom({ roles, nickname, name, avatar, capacity }) {
       const d = read();
       let code;
       do code = Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
       while (d.rooms[code]);
       d.rooms[code] = {
-        room: { creatorUid: uid, status: 'collecting', roles, ...(name ? { name } : {}) },
+        room: { creatorUid: uid, status: 'collecting', roles, ...(name ? { name } : {}), ...(capacity ? { capacity } : {}) },
         members: { [uid]: { nickname, submitted: false, ...(avatar ? { avatar } : {}) } },
         prefs: {},
         result: null,
@@ -59,12 +59,23 @@ export function createMemoryStore() {
     subscribePrivate: (code, cb) => sub((d) => d.rooms[code]?.privates?.[uid] || null, cb),
     async join(code, nickname, avatar) {
       const d = read();
+      const cap = d.rooms[code].room.capacity;
+      if (cap && !d.rooms[code].members[uid] && Object.keys(d.rooms[code].members).length >= cap) {
+        const e = new Error('이 방은 정원이 찼어요.');
+        e.code = 'room-full';
+        throw e;
+      }
       d.rooms[code].members[uid] = { nickname, submitted: false, ...(avatar ? { avatar } : {}) };
       write(d);
     },
     async updateRoles(code, roles) {
       const d = read();
       d.rooms[code].room.roles = roles;
+      write(d);
+    },
+    async updateCapacity(code, capacity) {
+      const d = read();
+      d.rooms[code].room.capacity = capacity;
       write(d);
     },
     async updateGuide(code, roleId, guide) {

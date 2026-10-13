@@ -1,8 +1,9 @@
 import './style.css';
 import { createStore } from './store.js';
-import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, LOAD_LABEL } from '../lib/roomService.js';
+import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, normalizeCapacity, CAPACITY_MIN, CAPACITY_MAX } from '../lib/roomService.js';
 import { AVATAR_IDS, AVATAR_BG, AVATAR_LABEL, validAvatar, defaultAvatar } from '../lib/avatars.js';
 import { relevantTraits, suggestPrefs } from '../lib/traits.js';
+import { makeLadder, walkLadder } from '../lib/ladder.js';
 import { KINDS, ICON_IDS, DESC_MAX, STEP_MAX, STEP_COUNT, kindFromName, kindOfRole, exampleDesc, templateFor } from '../lib/roleGuide.js';
 
 const $app = document.getElementById('app');
@@ -29,7 +30,7 @@ function playAnim(sel, cls, ms = 600) {
   el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
   setTimeout(() => el.classList.remove(cls), ms);
 }
-const home = { selected: new Map(TEMPLATES.slice(0, 4).map((t) => [t.name, t.load])), custom: [], roomName: '' };
+const home = { capacity: null, selected: new Map(TEMPLATES.slice(0, 4).map((t) => [t.name, t.load])), custom: [], roomName: '' };
 
 function toast(msg) {
   $toast.textContent = msg;
@@ -212,6 +213,7 @@ function renderJoinCode() {
 /* ---------------- 방 만들기 ---------------- */
 function renderCreate() {
   cleanup();
+  if (!home.capacity) home.capacity = store?.mode === 'demo' ? 1 : 4; // 체험은 혼자 해 볼 수 있게 1명부터
   const customList = home.custom.filter((n) => !TEMPLATES.some((t) => t.name === n));
   const chipIcon = (n) => { const k = kindFromName(n); return k ? roleIcon({ kind: k }, 15) : ''; };
   $app.innerHTML = `
@@ -230,6 +232,10 @@ function renderCreate() {
         <p class="err" id="err-nick" hidden>닉네임을 입력해 주세요</p>
       </div>
       <div>
+        <label for="cap">팀원 수 <span class="tag req">나 포함</span></label>
+        <div class="cap-row"><select id="cap" class="cap-select" aria-label="팀원 수">${Array.from({ length: CAPACITY_MAX - CAPACITY_MIN + 1 }, (_, i) => CAPACITY_MIN + i).map((n) => `<option value="${n}" ${home.capacity === n ? 'selected' : ''}>${n}명</option>`).join('')}</select><span class="muted small">정해진 인원이 다 들어오면 방이 닫혀요</span></div>
+      </div>
+      <div>
         <label>필요한 역할 <span class="tag req">1개 이상</span></label>
         <div class="chips" id="role-chips">
           ${TEMPLATES.map((t) => `<button type="button" class="chip" data-role="${esc(t.name)}" aria-pressed="${home.selected.has(t.name)}">${chipIcon(t.name)}${esc(t.name)}</button>`).join('')}
@@ -240,6 +246,7 @@ function renderCreate() {
           <button type="button" class="btn ghost" id="add-custom">추가</button>
         </div>
         <p class="err" id="err-roles" hidden>역할을 1개 이상 골라 주세요</p>
+        <p class="notice cap-hint" id="cap-hint" hidden></p>
       </div>
       <button type="button" class="btn big" id="create">방 만들기</button>
       <p class="muted small center" id="create-note"></p>
@@ -255,6 +262,10 @@ function renderCreate() {
     const nickOk = !!$nick.value.replace(/\s+/g, ' ').trim();
     const rolesOk = home.selected.size > 0;
     const set = (id, show) => { const e = $app.querySelector(id); if (e) e.hidden = !show; };
+    const capHint = $app.querySelector('#cap-hint');
+    const nr = home.selected.size;
+    const capMsg = nr && nr > home.capacity ? `역할 ${nr}개, 팀원 ${home.capacity}명이에요. 한 사람이 역할을 여러 개 맡을 수 있어요.` : nr && nr < home.capacity ? `역할 ${nr}개, 팀원 ${home.capacity}명이에요. 역할 없이 남는 팀원이 생길 수 있어요.` : '';
+    capHint.textContent = capMsg; capHint.hidden = !capMsg;
     $app.querySelector('#cnt-name').textContent = `${$name.value.length}/20`;
     $app.querySelector('#cnt-nick').textContent = `${$nick.value.length}/12`;
     set('#err-name', seen.name && !nameOk); set('#err-nick', seen.nick && !nickOk); set('#err-roles', seen.roles && !rolesOk);
@@ -269,6 +280,7 @@ function renderCreate() {
   $nick.addEventListener('blur', () => { seen.nick = true; refresh(); });
   $nick.addEventListener('input', refresh);
   $name.addEventListener('input', refresh);
+  $app.querySelector('#cap').addEventListener('change', (e) => { home.capacity = normalizeCapacity(e.target.value) || 1; refresh(); });
   $app.querySelector('#role-chips').addEventListener('click', (e) => {
     const b = e.target.closest('.chip');
     if (!b) return;
@@ -309,7 +321,7 @@ function renderCreate() {
       saveNick(nickname);
       const name = normalizeRoomName(home.roomName);
       saveAvatar(draftAv);
-      const code = await store.createRoom({ roles, nickname, name, avatar: draftAv });
+      const code = await store.createRoom({ roles, nickname, name, avatar: draftAv, capacity: normalizeCapacity(home.capacity) });
       home.roomName = '';
       location.hash = `#/room/${code}`;
     } catch (err) {
@@ -366,7 +378,7 @@ const assigned = () => S.room?.status === 'assigned';
 
 async function openRoom(code, view = 'hub') {
   cleanup();
-  S = { code, view, room: null, members: [], result: null, priv: null, rolesDraft: null, rolesOpen: new Set(), rolesSig: '', prefsSig: '', form: null, cardRole: null, editGuide: false, confirmReopen: false, pIdx: null, sheet: false, traits: new Set(), touched: new Set(), prefsLoaded: false, busy: false, confirmAssign: false, confirmSlots: false, loaded: false };
+  S = { code, view, room: null, members: [], result: null, priv: null, rolesDraft: null, rolesOpen: new Set(), rolesSig: '', prefsSig: '', form: null, cardRole: null, editGuide: false, confirmReopen: false, pIdx: null, sheet: false, traits: new Set(), touched: new Set(), prefsLoaded: false, busy: false, confirmAssign: false, confirmSlots: false, capEdit: false, draw: null, drawn: loadDrawn(), loaded: false };
   roomShell(code);
   const status = $app.querySelector('#s-status');
   status.innerHTML = '<span class="muted"><span class="spinner"></span>방을 불러오는 중…</span>';
@@ -442,15 +454,15 @@ function applyView() {
 }
 
 /** 역할 자리 수(필요 인원 합계)와 참여 인원을 비교한다. */
-function slotInfo(roles) {
-  const people = S.members.length;
+function slotInfo(roles, planned) {
+  const people = planned && S.room?.capacity ? S.room.capacity : S.members.length;
   const slots = roles.reduce((s, r) => s + Math.min(r.need || 1, Math.max(people, 1)), 0);
   return { people, slots };
 }
 
 /** 안 맞을 때의 안내 문구. 맞으면 null */
-function slotMsg(roles) {
-  const { people, slots } = slotInfo(roles);
+function slotMsg(roles, planned) {
+  const { people, slots } = slotInfo(roles, planned);
   if (!people || !slots || slots === people) return null;
   if (slots > people) return { title: `역할 자리가 팀원보다 ${slots - people}개 많아요`, body: '한 사람이 역할을 2개 이상 맡을 수 있어요. 비슷한 역할을 합치거나 필요 인원을 줄이면 한 명이 하나씩 맡아요.' };
   return { title: `팀원이 역할 자리보다 ${people - slots}명 많아요`, body: `${people - slots}명은 역할 없이 남을 수 있어요. 필요 인원을 늘리거나 역할을 추가하면 모두가 맡아요.` };
@@ -459,10 +471,10 @@ function slotMsg(roles) {
 /** 방장에게만: 역할 자리 수와 참여 인원을 비교해 안내한다. */
 function slotGuide(roles) {
   if (!isCreator()) return '';
-  const { people, slots } = slotInfo(roles);
-  const m = slotMsg(roles);
+  const { people, slots } = slotInfo(roles, true);
+  const m = slotMsg(roles, true);
   if (!m) return '';
-  return `<div class="slot-box"><div class="row between"><b>${m.title}</b><span class="tg">방장에게만</span></div><div class="slot-chips"><span>역할 자리 ${esc(slots)}</span><span>참여 ${esc(people)}</span></div></div>`;
+  return `<div class="slot-box"><div class="row between"><b>${m.title}</b><span class="tg">방장에게만</span></div><div class="slot-chips"><span>역할 자리 ${esc(slots)}</span><span>팀원 ${esc(people)}</span></div></div>`;
 }
 
 /** 허브: 내가 지금 할 일을 단계별로 보여 준다. */
@@ -490,7 +502,9 @@ function renderStatus() {
   const el = $app.querySelector('#s-status');
   const done = assigned();
   const n = S.members.length; const sub = S.members.filter((m) => m.submitted).length;
-  el.textContent = done ? `${n}명 참여 · 배정 완료` : `${n}명 참여 · 선호 ${sub}/${n}`;
+  const cap = S.room?.capacity;
+  const joinedTxt = cap && !done ? `${n}/${cap}명 입장` : `${n}명 참여`;
+  el.textContent = done ? `${n}명 참여 · 배정 완료` : `${joinedTxt} · 선호 ${sub}/${n}`;
 }
 
 function renderJoin() {
@@ -498,6 +512,14 @@ function renderJoin() {
   if (!S.membersLoaded) return;
   if (me()) {
     if (el.innerHTML) el.innerHTML = '';
+    return;
+  }
+  const cap = S.room?.capacity;
+  if (cap && S.members.length >= cap && !assigned()) {
+    el.innerHTML = `
+    <div class="jn-room"><span>${esc(S.room?.name || '')}</span><b>${esc(S.code)}</b></div>
+    <div class="jn-head"><div><h1 class="jn-title">정원이<br>다 찼어요</h1><p class="muted">이 방은 ${esc(cap)}명이 모두 들어왔어요.<br>팀원 수가 바뀌었다면 방장에게 수정을 부탁해 주세요.</p></div><img class="jn-taba" src="/taba.png" alt="" width="110" height="110" /></div>
+    <button type="button" class="btn big line" id="join-home">처음으로</button>`;
     return;
   }
   if (el.querySelector('#join-nick')) return; // 입력 중이면 다시 그리지 않음
@@ -780,6 +802,8 @@ function renderMembers() {
   const total = S.members.length;
   const submitted = S.members.filter((m) => m.submitted).length;
   const missing = total - submitted;
+  const cap = S.room?.capacity || 0;
+  const waiting = cap ? Math.max(0, cap - total) : 0; // 아직 들어오지 않은 팀원
   const creator = isCreator();
   let action = '';
   const sm = creator ? slotMsg(S.room?.roles || []) : null;
@@ -792,27 +816,37 @@ function renderMembers() {
         </div>`;
     } else if (S.busy) {
       action = '<button type="button" class="btn big" id="do-assign" disabled><span class="spinner"></span>배정하는 중…</button>';
-    } else if (missing === 0) {
+    } else if (missing === 0 && waiting === 0) {
       action = '<button type="button" class="btn big" id="do-assign" ' + (submitted === 0 ? 'disabled' : '') + '>배정하기</button>';
     } else if (S.confirmAssign) {
+      const notes = [
+        waiting > 0 ? `아직 ${esc(waiting)}명이 들어오지 않았어요. 지금 들어온 ${esc(total)}명으로 배정하면, 나중에 들어오는 사람은 이번 배정에 포함되지 않아요.` : '',
+        missing > 0 ? `미제출 ${esc(missing)}명은 선호가 없는 상태로 처리돼요(모든 역할을 "상관없어요"로 봐요). 그 팀원이 원하지 않는 역할에 배정될 수 있어요.` : '',
+      ].filter(Boolean).join(' ');
       action = `<div class="stack">
-          <p class="notice">미제출 ${esc(missing)}명은 선호가 없는 상태로 처리돼요(모든 역할을 "상관없어요"로 봐요). 그 팀원이 원하지 않는 역할에 배정될 수 있어요.</p>
-          <button type="button" class="btn" id="do-assign">미제출 ${esc(missing)}명 포함해서 배정하기</button>
-          <button type="button" class="btn line" id="cancel-assign">선호 제출을 기다리기</button>
+          <p class="notice">${notes}</p>
+          <button type="button" class="btn" id="do-assign">${waiting > 0 ? `지금 ${esc(total)}명으로 배정하기` : `미제출 ${esc(missing)}명 포함해서 배정하기`}</button>
+          <button type="button" class="btn line" id="cancel-assign">${waiting > 0 ? '팀원을 기다리기' : '선호 제출을 기다리기'}</button>
         </div>`;
     } else {
       action = `<div class="stack">
-          <button type="button" class="btn big" id="do-assign" disabled>모두 입력하면 배정할 수 있어요 (${esc(submitted)}/${esc(total)})</button>
-          ${submitted > 0 ? '<button type="button" class="link" id="force-assign" style="align-self:center">그래도 배정하기</button>' : '<p class="muted small">한 명 이상 선호를 저장하면 배정할 수 있어요.</p>'}
+          <button type="button" class="btn big" id="do-assign" disabled>${waiting > 0 ? `팀원이 다 들어오면 배정할 수 있어요 (${esc(total)}/${esc(cap)}명)` : `모두 입력하면 배정할 수 있어요 (${esc(submitted)}/${esc(total)})`}</button>
+          ${submitted > 0 ? '<button type="button" class="link" id="force-assign" style="align-self:center">그래도 배정하기</button>' : '<p class="muted small center">한 명 이상 선호를 저장하면 배정할 수 있어요.</p>'}
         </div>`;
     }
   }
+  const capRow = creator && !assigned()
+    ? S.capEdit
+      ? `<div class="cap-edit"><select id="cap-sel" class="cap-select" aria-label="팀원 수">${Array.from({ length: CAPACITY_MAX - Math.max(total, CAPACITY_MIN) + 1 }, (_, i) => Math.max(total, CAPACITY_MIN) + i).map((n) => `<option value="${n}" ${n === (cap || total) ? 'selected' : ''}>${n}명</option>`).join('')}</select><button type="button" class="btn" id="cap-save">저장</button><button type="button" class="txt-link sm" id="cap-cancel">취소</button></div><p class="muted small center">이미 들어온 ${esc(total)}명보다 적게는 줄일 수 없어요.</p>`
+      : `<div class="txt-row"><button type="button" class="txt-link sm" id="cap-edit">${cap ? `팀원 수 ${esc(cap)}명 · 수정` : '팀원 수 정하기'}</button></div>`
+    : '';
   el.innerHTML = `
     <div class="members-sec">
-      <div class="row between"><h2 class="sec-h">참여 현황</h2><span class="tg">${esc(submitted)}/${esc(total)}명 입력 완료</span></div>
+      <div class="row between"><h2 class="sec-h">참여 현황</h2><span class="tg">${esc(submitted)}/${esc(cap || total)}명 입력 완료</span></div>
       <div class="avs">
-        ${S.members.map((m) => { const mine = m.uid === store.uid; const ck = m.submitted ? `<i class="av-ok${prevDone && !prevDone.has(m.uid) ? ' pop-in' : ''}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#1F6B49" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg></i>` : ''; return `<span class="av-item ${m.submitted ? 'done' : ''}">${mine ? `<button type="button" class="av-c av-me" data-av-toggle="me" aria-label="내 캐릭터 바꾸기">${avatarHtml(avatarOf(m))}<i class="av-edit" aria-hidden="true">✎</i>${ck}</button>` : `<span class="av-c">${avatarHtml(avatarOf(m))}${ck}</span>`}<small>${esc(m.nickname)}${mine ? ' (나)' : ''}</small></span>`; }).join('')}
+        ${S.members.map((m) => { const mine = m.uid === store.uid; const ck = m.submitted ? `<i class="av-ok${prevDone && !prevDone.has(m.uid) ? ' pop-in' : ''}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#1F6B49" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg></i>` : ''; return `<span class="av-item ${m.submitted ? 'done' : ''}">${mine ? `<button type="button" class="av-c av-me" data-av-toggle="me" aria-label="내 캐릭터 바꾸기">${avatarHtml(avatarOf(m))}<i class="av-edit" aria-hidden="true">✎</i>${ck}</button>` : `<span class="av-c">${avatarHtml(avatarOf(m))}${ck}</span>`}<small>${esc(m.nickname)}${mine ? ' (나)' : ''}</small></span>`; }).join('')}${Array.from({ length: waiting }, () => '<span class="av-item wait"><span class="av-c" aria-hidden="true"></span><small>대기</small></span>').join('')}
       </div>
+      ${capRow}
       ${S.avOpen ? `<div class="avp-wrap">${avatarPickerHtml(avatarOf(me()), 'me')}<p class="muted small">언제든 바꿀 수 있어요. 팀원에게 보이는 프로필이에요.</p></div>` : ''}
       ${action}
       ${!creator && !assigned() ? '<p class="muted small center">방장이 배정 버튼을 누르면 결과가 나와요.</p>' : ''}
@@ -999,15 +1033,119 @@ function whyItemsHtml(lines) {
   return rows.filter((r) => !r.includes('why-load')).concat(load).join('');
 }
 
+/* ---------------- 동점(무작위)일 때 결과 확인 연출: 제비뽑기 · 사다리타기 ---------------- */
+// 결과는 서버가 이미 정해 두었다. 여기서는 그 결과를 열어 보는 방식만 고른다.
+function loadDrawn() {
+  try { return new Set(JSON.parse(sessionStorage.getItem('roleapp-drawn') || '[]')); } catch { return new Set(); }
+}
+function saveDrawn() {
+  try { sessionStorage.setItem('roleapp-drawn', JSON.stringify([...S.drawn])); } catch { /* 저장이 막혀 있어도 동작에는 문제없다 */ }
+}
+const drawCount = () => Math.min(6, Math.max(3, (S.room?.roles || []).length));
+
+/** 무작위(동점)로 정해진 내 역할이 있고 아직 확인 전이면 그 역할. 아니면 null */
+function pendingDraw(r, duties) {
+  if (!S.priv || !duties.length) return null;
+  const key = `${S.code}:${r.round || 1}:${store.uid}`;
+  if (S.drawn.has(key)) return null;
+  const rnd = new Set();
+  for (const l of S.priv.lines || []) {
+    const m = String(l).match(/^(.+?) · (.+?) — (.*)$/s);
+    if (m && m[3].includes('무작위')) rnd.add(m[1]);
+  }
+  const duty = duties.find((x) => rnd.has(x.name));
+  return duty ? { duty, key } : null;
+}
+
+function ladderSvg(L, start, step, end) {
+  const xs = (i) => 30 + i * (240 / (L.n - 1));
+  const top = 56, bot = 250, ys = (k) => top + (k + 1) * ((bot - top) / (L.rows + 1));
+  const lines = Array.from({ length: L.n }, (_, i) => `<line x1="${xs(i)}" y1="${top}" x2="${xs(i)}" y2="${bot}" class="ld-line"/>`).join('');
+  const rungs = L.rungs.map((row, k) => row.map((c) => `<line x1="${xs(c)}" y1="${ys(k)}" x2="${xs(c + 1)}" y2="${ys(k)}" class="ld-line"/>`).join('')).join('');
+  const tokens = Array.from({ length: L.n }, (_, i) => `<g class="ld-token${start === i ? ' on' : ''}" ${start == null ? `data-start="${i}" role="button" tabindex="0" aria-label="${i + 1}번 출발"` : ''}><circle cx="${xs(i)}" cy="26" r="18"/><text x="${xs(i)}" y="32" text-anchor="middle">${i + 1}</text></g>`).join('');
+  let path = '';
+  if (start != null) {
+    const w = walkLadder(L, start);
+    const pts = w.points.map(([c, k]) => `${xs(c)},${k < 0 ? top : k >= L.rows ? bot : ys(k)}`).join(' ');
+    path = `<polyline class="ld-path${step === 'run' ? ' run' : ''}" pathLength="1" points="${pts}"/>`;
+  }
+  const ends = Array.from({ length: L.n }, (_, i) => `<g class="ld-end${step === 'done' && i === end ? ' hit' : ''}"><circle cx="${xs(i)}" cy="276" r="15"/><text x="${xs(i)}" y="282" text-anchor="middle">${step === 'done' && i === end ? '✓' : '?'}</text></g>`).join('');
+  return `<svg class="ladder" viewBox="0 0 300 300" role="img" aria-label="사다리타기">${lines}${rungs}${path}${tokens}${ends}</svg>`;
+}
+
+function drawHtml(pd, r) {
+  const d = pd.duty;
+  const st = S.draw;
+  const n = drawCount();
+  const result = `<div class="draw-result"><span class="tile" style="background:${tileBgOf(d)};width:56px;height:56px;border-radius:20px">${roleIcon(d, 30)}</span><div><p class="muted small">이번에 맡은 역할</p><b>${esc(d.name)}</b></div></div>`;
+  let title = '같은 조건이라 무작위로 정해졌어요';
+  let body = '';
+  if (st.step === 'pick') {
+    body = `<p class="muted">결과는 이미 정해져 있어요. 확인할 방법을 골라 보세요.</p>
+      <div class="draw-opts">
+        <button type="button" class="draw-opt" data-draw="card"><span class="do-ico"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M12 8.500l1 2 2.200.3-1.600 1.500.4 2.200-2-1.100-2 1.100.4-2.200L8.800 10.800 11 10.500z"/></svg></span><b>제비뽑기</b><small>카드를 뒤집어요</small></button>
+        <button type="button" class="draw-opt" data-draw="ladder"><span class="do-ico"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18M7 8h10M7 14h10"/></svg></span><b>사다리타기</b><small>출발점을 골라요</small></button>
+      </div>
+      <button type="button" class="txt-link sm" data-draw="skip">바로 결과 보기</button>`;
+  } else if (st.method === 'card') {
+    const done = st.pick != null;
+    title = done ? '뽑았어요!' : '카드를 하나 골라 뒤집어 보세요';
+    body = `<div class="draw-cards n${n}">${Array.from({ length: n }, (_, i) => `<div class="draw-card${done ? (st.pick === i ? ' flip' : ' dim') : ''}" data-card="${i}" role="button" tabindex="${done ? -1 : 0}" aria-label="${i + 1}번 카드"><span class="face back">?</span><span class="face front"><span class="tile" style="background:${tileBgOf(d)};width:44px;height:44px;border-radius:16px">${roleIcon(d, 24)}</span><b>${esc(d.name)}</b></span></div>`).join('')}</div>
+      <div id="draw-after" ${done ? '' : 'hidden'}>${result}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>`;
+  } else {
+    const L = st.ladder;
+    const end = st.start != null ? walkLadder(L, st.start).end : null;
+    const done = st.step === 'done';
+    title = done ? '도착했어요!' : st.step === 'run' ? '내려가는 중…' : '출발점을 골라 보세요';
+    body = `${ladderSvg(L, st.start, st.step, end)}
+      ${done ? `<div id="draw-after">${result}<button type="button" class="btn big" id="draw-done">내 결과 보기</button></div>` : ''}`;
+  }
+  return `<section class="draw"><span class="badge">${esc(r.round || 1)}차 배정</span><h2 class="draw-title">${title}</h2>${body}</section>`;
+}
+
+function drawAction(kind) {
+  if (kind === 'skip') return finishDraw();
+  if (kind === 'card') S.draw = { step: 'card', method: 'card', pick: null };
+  if (kind === 'ladder') S.draw = { step: 'start', method: 'ladder', ladder: makeLadder(drawCount(), 9), start: null };
+  renderMine();
+}
+function pickCard(btn) {
+  if (!S.draw || S.draw.method !== 'card' || S.draw.pick != null) return;
+  S.draw.pick = +btn.dataset.card;
+  const wrap = btn.closest('.draw-cards');
+  wrap.querySelectorAll('.draw-card').forEach((c) => { c.tabIndex = -1; c.classList.add(c === btn ? 'flip' : 'dim'); });
+  const after = $app.querySelector('#draw-after');
+  if (after) { after.hidden = false; if (!REDUCED_MOTION()) setTimeout(() => playAnim(after, 'rise', 700), 350); }
+  const t = $app.querySelector('.draw-title'); if (t) t.textContent = '뽑았어요!';
+}
+function pickStart(i) {
+  if (!S.draw || S.draw.method !== 'ladder' || S.draw.start != null) return;
+  S.draw.start = i;
+  S.draw.step = REDUCED_MOTION() ? 'done' : 'run';
+  renderMine();
+  if (S.draw.step === 'run') setTimeout(() => { if (S.draw && S.draw.step === 'run') { S.draw.step = 'done'; renderMine(); } }, 2500);
+}
+function finishDraw() {
+  const duties = S.result ? myDuties(S.result) : [];
+  const pd = S.result ? pendingDraw(S.result, duties) : null;
+  if (pd) { S.drawn.add(pd.key); saveDrawn(); }
+  S.draw = null;
+  S.mineSig = '';
+  renderMine();
+}
+
 function renderMine() {
   const el = $app.querySelector('#s-mine');
   const r = S.result;
   if (!me() || !assigned() || !r) { el.innerHTML = ''; S.mineSig = ''; return; }
   const duties = myDuties(r);
-  const sig = JSON.stringify([r.round, duties.map((d) => d.name), S.priv?.lines || [], msgOf(store.uid)]);
+  const pd = pendingDraw(r, duties);
+  if (pd && !S.draw) S.draw = { step: 'pick' };
+  const sig = JSON.stringify([r.round, duties.map((d) => d.name), S.priv?.lines || [], msgOf(store.uid), pd ? [S.draw?.step, S.draw?.method, S.draw?.pick ?? null, S.draw?.start ?? null] : 0]);
   if (sig === S.mineSig) return; // 입력 중인 글이 지워지지 않게, 바뀐 게 없으면 다시 그리지 않는다
   const firstMine = !S.mineSig;
   S.mineSig = sig;
+  if (pd) { el.innerHTML = drawHtml(pd, r); return; }
   el.innerHTML = `
     <section class="mine-top">
       <span class="badge">${esc(r.round || 1)}차 배정</span>
@@ -1141,6 +1279,7 @@ function attachDelegates() {
   const q = (id) => $app.querySelector(id);
   // 참여
   q('#s-join').addEventListener('click', async (e) => {
+    if (e.target.closest('#join-home')) { location.hash = '#/'; return; }
     if (!e.target.closest('#do-join')) return;
     const nickname = q('#join-nick').value.replace(/\s+/g, ' ').trim().slice(0, 12);
     if (!nickname) return toast('닉네임을 입력해 주세요.');
@@ -1344,12 +1483,29 @@ function attachDelegates() {
   q('#s-members').addEventListener('click', async (e) => {
     if (e.target.closest('#force-assign')) { S.confirmAssign = true; renderMembers(); return; }
     if (e.target.closest('#cancel-assign')) { S.confirmAssign = false; renderMembers(); return; }
+    if (e.target.closest('#cap-edit')) { S.capEdit = true; renderMembers(); return; }
+    if (e.target.closest('#cap-cancel')) { S.capEdit = false; renderMembers(); return; }
+    if (e.target.closest('#cap-save')) {
+      const n = normalizeCapacity(q('#cap-sel').value);
+      if (!n || n < S.members.length) return toast(`이미 ${S.members.length}명이 들어와서 그보다 적게는 줄일 수 없어요.`);
+      try {
+        await store.updateCapacity(S.code, n);
+        S.capEdit = false;
+        toast(`팀원 수를 ${n}명으로 바꿨어요.`);
+        renderAll();
+      } catch (err) {
+        console.error(err);
+        toast(`바꾸지 못했어요: ${err.message}`);
+      }
+      return;
+    }
     if (e.target.closest('#slot-edit')) { S.confirmSlots = false; location.hash = `#/room/${S.code}/roles`; return; }
     const go = e.target.closest('#slot-go');
     if (!go && !e.target.closest('#do-assign')) return;
     if (S.busy) return;
     const missing = S.members.filter((m) => !m.submitted).length;
-    if (missing > 0 && !S.confirmAssign) return; // 미제출자가 있으면 "그래도 배정하기"를 거쳐야 한다
+    const waiting = S.room?.capacity ? Math.max(0, S.room.capacity - S.members.length) : 0;
+    if ((missing > 0 || waiting > 0) && !S.confirmAssign) return; // 미제출자·미입장자가 있으면 "그래도 배정하기"를 거쳐야 한다
     // 역할 자리와 인원이 안 맞으면 한 번 확인한다
     if (!go && slotMsg(S.room?.roles || [])) { S.confirmSlots = true; renderMembers(); return; }
     S.confirmSlots = false;
@@ -1453,6 +1609,13 @@ function attachDelegates() {
   q('#s-mine').addEventListener('input', (e) => { if (e.target.id === 'msg') syncMsg(); });
   q('#s-mine').addEventListener('keydown', (e) => { if (e.target.id === 'msg' && e.key === 'Enter') q('#save-msg').click(); });
   q('#s-mine').addEventListener('click', async (e) => {
+    const dr = e.target.closest('[data-draw]');
+    if (dr) { drawAction(dr.dataset.draw); return; }
+    const cd = e.target.closest('[data-card]');
+    if (cd) { pickCard(cd); return; }
+    const ds = e.target.closest('[data-start]');
+    if (ds) { pickStart(+ds.dataset.start); return; }
+    if (e.target.closest('#draw-done')) { finishDraw(); return; }
     if (e.target.closest('#go-card')) { S.cardRole = (S.priv?.roleIds || [])[0] || null; S.editGuide = false; S.cardFrom = 'mine'; location.hash = `#/room/${S.code}/card`; return; }
     if (e.target.closest('#go-team')) { location.hash = `#/room/${S.code}/team`; return; }
     if (e.target.closest('#save-msg')) {

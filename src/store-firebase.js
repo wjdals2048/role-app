@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, serverTimestamp } from 'firebase/firestore';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const makeCode = () => Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
@@ -50,11 +50,11 @@ export function createFirebaseStore(config) {
     get uid() {
       return uid;
     },
-    async createRoom({ roles, nickname, name, avatar }) {
+    async createRoom({ roles, nickname, name, avatar, capacity }) {
       for (let i = 0; i < 6; i++) {
         const code = makeCode();
         try {
-          await setDoc(doc(db, 'rooms', code), { creatorUid: uid, status: 'collecting', roles, createdAt: serverTimestamp(), ...(name ? { name } : {}) });
+          await setDoc(doc(db, 'rooms', code), { creatorUid: uid, status: 'collecting', roles, createdAt: serverTimestamp(), ...(name ? { name } : {}), ...(capacity ? { capacity } : {}) });
           await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp(), ...(avatar ? { avatar } : {}) });
           return code;
         } catch (e) {
@@ -74,6 +74,16 @@ export function createFirebaseStore(config) {
     subscribePrivate: (code, cb) =>
       watch(doc(db, 'rooms', code, 'results_private', uid), cb, (s) => (s.exists() ? s.data() : null)),
     async join(code, nickname, avatar) {
+      // 팀원 수가 정해진 방은 정원이 차면 새 사람이 들어올 수 없다 (이미 들어온 사람은 다시 들어올 수 있다)
+      const cap = (await getDoc(doc(db, 'rooms', code))).data()?.capacity;
+      if (cap) {
+        const snap = await getDocs(collection(db, 'rooms', code, 'members'));
+        if (!snap.docs.some((d) => d.id === uid) && snap.size >= cap) {
+          const e = new Error('이 방은 정원이 찼어요.');
+          e.code = 'room-full';
+          throw e;
+        }
+      }
       await setDoc(doc(db, 'rooms', code, 'members', uid), { nickname, submitted: false, joinedAt: serverTimestamp(), ...(avatar ? { avatar } : {}) });
     },
     async setAvatar(code, avatar) {
@@ -81,6 +91,9 @@ export function createFirebaseStore(config) {
     },
     async updateRoles(code, roles) {
       await updateDoc(doc(db, 'rooms', code), { roles });
+    },
+    async updateCapacity(code, capacity) {
+      await updateDoc(doc(db, 'rooms', code), { capacity });
     },
     async updateGuide(code, roleId, guide) {
       await updateDoc(doc(db, 'rooms', code), { [`guides.${roleId}`]: guide });

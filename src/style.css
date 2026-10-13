@@ -678,3 +678,93 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 /* 16차: 필요 인원 선택 — 이름 칸과 같은 알약 */
 .role-edit .r-need { -webkit-appearance: none; appearance: none; width: 92px; flex: none; padding: 15px 30px 15px 20px; border-radius: 999px; color: #1F2340; cursor: pointer;
   background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5L6 6l4.5-4.5' fill='none' stroke='%234452C8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center; background-size: 12px 8px; }
+
+/* 17차: 움직임 효과 (동작 줄이기를 켠 사람에게는 적용하지 않는다) */
+@media (prefers-reduced-motion: no-preference) {
+  .chip, .pf-opt, .btn, .txt-link { transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .2s, background-color .2s; }
+  .chip:active, .pf-opt:active { transform: scale(.93); }
+  .pf-stack.leave-l .pf-card, .pf-stack.leave-l .pf-taba { animation: leaveL .23s cubic-bezier(.5,0,.9,.6) forwards; }
+  .pf-stack.leave-r .pf-card, .pf-stack.leave-r .pf-taba { animation: leaveR .23s cubic-bezier(.5,0,.9,.6) forwards; }
+  .pf-stack.deal .pf-card { animation: dealIn .42s cubic-bezier(.2,.9,.3,1.15); }
+  .pf-stack.deal .pf-taba { animation: tabaIn .5s cubic-bezier(.2,.9,.3,1.3) .08s both; }
+  #app.page-in { animation: pageIn .38s cubic-bezier(.2,.8,.2,1); }
+  #s-mine.reveal > section, #s-mine.reveal > button { animation: rise .55s cubic-bezier(.2,.8,.2,1) both; }
+  #s-mine.reveal > :nth-child(1) { animation-delay: .05s; }
+  #s-mine.reveal > :nth-child(2) { animation-delay: .22s; }
+  #s-mine.reveal > :nth-child(3) { animation-delay: .38s; }
+  #s-mine.reveal > :nth-child(4) { animation-delay: .52s; }
+  #s-mine.reveal > :nth-child(n+5) { animation-delay: .64s; }
+  #s-mine.reveal .my-hero, #s-mine.reveal .my-cell { animation: pop .6s cubic-bezier(.34,1.56,.64,1) .2s both; }
+  #s-prefs.fade-up { animation: fadeUp .3s ease-out; }
+  .pop { animation: pop .42s cubic-bezier(.34,1.56,.64,1); }
+  .av-ok.pop-in { animation: popIn .5s cubic-bezier(.34,1.56,.64,1); }
+  .res-flat.reveal .role-card { animation: rise .55s cubic-bezier(.2,.8,.2,1) both; }
+  .res-flat.reveal .role-card:nth-child(1) { animation-delay: .05s; }
+  .res-flat.reveal .role-card:nth-child(2) { animation-delay: .15s; }
+  .res-flat.reveal .role-card:nth-child(3) { animation-delay: .25s; }
+  .res-flat.reveal .role-card:nth-child(4) { animation-delay: .35s; }
+  .res-flat.reveal .role-card:nth-child(5) { animation-delay: .45s; }
+  .res-flat.reveal .role-card:nth-child(n+6) { animation-delay: .55s; }
+  .res-flat.reveal .tm-chars img { animation: hop .8s cubic-bezier(.3,.7,.4,1) .1s both; }
+  .res-flat.reveal .tm-chars img + img { animation-delay: .28s; }
+}
+@keyframes slideR { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes slideL { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { scale: 1; } 40% { scale: 1.14; } 100% { scale: 1; } }
+@keyframes popIn { 0% { scale: 0; } 60% { scale: 1.35; } 100% { scale: 1; } }
+@keyframes rise { from { opacity: 0; transform: translateY(26px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes hop { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(-16px); } 60% { transform: translateY(0); } 78% { transform: translateY(-5px); } }
+
+@keyframes leaveL { to { opacity: 0; transform: translateX(-120%) rotate(-10deg); } }
+@keyframes leaveR { to { opacity: 0; transform: translateX(120%) rotate(10deg); } }
+@keyframes dealIn { 0% { opacity: 0; transform: translateY(28px) scale(.92) rotate(2deg); } 55% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes tabaIn { 0% { opacity: 0; transform: rotate(-12deg) translateY(16px) scale(.6); } 100% { opacity: 1; transform: rotate(-12deg); } }
+@keyframes pageIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+/* 18차: 참여 현황 체크 = 민트 배경 + 흰 체크 */
+.av-ok { background: #5DCBA0; box-shadow: 0 0 0 3px #fff; }
+.av-ok svg path { stroke: #fff; }
+
+/* 19차: 한마디 말풍선 */
+.role-card.rc-col .msg { position: relative; margin: 10px 0 0 44px; background: #F3F4FF; border-radius: 14px; padding: 6px 12px; display: inline-block; font-size: 12.5px; color: #4B5170; }
+.role-card.rc-col .msg::before { content: ''; position: absolute; left: 14px; top: -5px; border: 6px solid transparent; border-top: 0; border-bottom-color: #F3F4FF; }
+
+/* 20차: 배정 이유 한 줄 요약 */
+.why-list p.why-one { font-size: 15px; color: #2B3050; margin: 2px 0 0; line-height: 1.5; }
+.why-more { margin-top: 4px; }
+.why-more summary { list-style: none; cursor: pointer; font-size: 12.5px; color: #6A70A0; text-decoration: underline; text-underline-offset: 3px; width: fit-content; padding: 4px 0; }
+.why-more summary::-webkit-details-marker { display: none; }
+.why-list .why-more p { font-size: 13px; margin: 4px 0 2px; color: #5B6190; }
+/* 21차: 캐릭터가 계속 뛴다 */
+@media (prefers-reduced-motion: no-preference) {
+  .about .ch { animation: fadeUp .4s cubic-bezier(.2,.8,.2,1); }
+  .ab-tab.on img, .tm-chars img { animation: idleHop 2.8s ease-in-out infinite; }
+  .sc-mata, .sc-taba { animation: idleHop 3.2s ease-in-out infinite; }
+  .sc-taba { animation-delay: 1.6s; }
+  .tm-chars img + img { animation-delay: .35s; }
+}
+@keyframes idleHop { 0%, 55%, 100% { transform: translateY(0); } 67% { transform: translateY(-9px); } 79% { transform: translateY(0); } 87% { transform: translateY(-3px); } 93% { transform: translateY(0); } }
+
+/* 22차: 뛰는 효과는 translate로 (회전·반전과 겹쳐도 유지) / 역할 저장 안내 / 일의 양 막대 */
+@keyframes idleHop { 0%, 55%, 100% { translate: 0 0; } 67% { translate: 0 -10px; } 79% { translate: 0 0; } 87% { translate: 0 -3px; } 93% { translate: 0 0; } }
+.save-note { display: flex; flex-direction: column; gap: 2px; align-items: center; word-break: keep-all; text-wrap: balance; line-height: 1.5; }
+.save-note span { display: block; }
+.lbar { margin: 8px 0 4px; }
+.lbar-track { position: relative; height: 14px; border-radius: 999px; background: #E6E9F7; overflow: hidden; }
+.lbar-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: #8E9BF0; }
+.lbar-mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #1F2340; opacity: .55; }
+.lbar-ticks { position: relative; display: flex; justify-content: space-between; font-size: 11.5px; color: #8A90AD; margin-top: 5px; }
+.lbar-ticks span:nth-child(2) { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
+.lbar-ticks em { display: block; font-style: normal; color: #4B5170; }
+.lbar-ticks { min-height: 30px; }
+
+.save-note { margin-top: 20px; }
+
+/* 23차: 한마디 말풍선 — 이름 옆에 한 줄, 누르면 펼침 */
+.role-card.rc-col .person { flex-direction: row; align-items: center; gap: 12px; width: 100%; }
+.role-card.rc-col .person .member { flex: none; }
+.role-card.rc-col .msg { flex: 1 1 0; min-width: 0; margin: 0; padding: 7px 13px; display: block; position: relative; background: #E8EBFD; color: #2B3050; font-size: 13px; line-height: 1.4; border-radius: 14px; cursor: pointer; word-break: keep-all; }
+.role-card.rc-col .msg::before { content: ''; position: absolute; left: -5px; top: 50%; margin-top: -6px; top: 50%; border: 6px solid transparent; border-left: 0; border-right-color: #E8EBFD; }
+.role-card.rc-col .msg > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-card.rc-col .msg.open > span { white-space: normal; overflow: visible; }
+.role-card.rc-col .person:has(.msg.open) { align-items: flex-start; }

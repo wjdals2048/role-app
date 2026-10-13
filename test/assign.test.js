@@ -200,9 +200,18 @@ test('일의 양이 비어 있으면 중(2)으로 본다', () => {
   assert.equal(r.load.A, 2);
 });
 
-test('일의 양 설명 줄이 "일의 양 · 내 합계 N점 — 팀 평균 M점" 형식으로 나온다', () => {
+test('역할이 사람보다 많아 여러 역할을 맡을 때만 일의 양 설명 줄이 나온다', () => {
+  const ctx = { people: ['A', 'B'], roles: [{ id: 'x', name: '팀장', need: 1, load: 3 }, { id: 'y', name: '일정', need: 1, load: 1 }, { id: 'z', name: '정리', need: 1, load: 2 }], prefs: {} };
+  const r = assignRoles(ctx, { seed: 1 });
+  assert.equal(r.loadOn, true);
+  const multi = ['A', 'B'].find((p) => r.byPerson[p].length > 1);
+  assert.ok(explainForPerson(r, ctx, multi).some((l) => l.startsWith('일의 양 · ')));
+});
+
+test('역할 수가 사람 수 이하이면 일의 양은 무시된다(모두 중)', () => {
   const ctx = { people: ['A', 'B'], roles: [{ id: 'x', name: '팀장', need: 1, load: 3 }, { id: 'y', name: '일정', need: 1, load: 1 }], prefs: {} };
   const r = assignRoles(ctx, { seed: 1 });
-  const lines = explainForPerson(r, ctx, 'A');
-  assert.ok(lines.some((l) => /^일의 양 · 내 합계 [\d.]+점 — 팀 평균 [\d.]+점$/.test(l)), JSON.stringify(lines));
+  assert.equal(r.loadOn, false);
+  assert.deepEqual(r.roles.map((x) => x.load), [2, 2]);
+  assert.ok(!explainForPerson(r, ctx, 'A').some((l) => l.startsWith('일의 양')));
 });

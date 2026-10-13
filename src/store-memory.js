@@ -49,6 +49,29 @@ export function createMemoryStore() {
       write(d);
       return code;
     },
+    /** 혼자 체험하기: 가상 팀원 3명이 이미 선호를 낸 방을 만들고, 나는 방장으로 들어간다. 이 브라우저 안에서만 만들어진다. */
+    async createSoloRoom({ roles, nickname, name, avatar, bots }) {
+      const d = read();
+      let code;
+      do code = Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
+      while (d.rooms[code]);
+      const members = { [uid]: { nickname, submitted: false, ...(avatar ? { avatar } : {}) } };
+      const prefs = {};
+      bots.forEach((b, i) => {
+        const id = `bot${i + 1}`;
+        members[id] = { nickname: b.nickname, submitted: true, avatar: b.avatar, ...(b.message ? { message: b.message } : {}) };
+        prefs[id] = { prefs: b.prefs, strength: '', wish: '', share: false, randomConsent: true };
+      });
+      d.rooms[code] = {
+        room: { creatorUid: uid, status: 'collecting', roles, name, capacity: bots.length + 1, solo: true },
+        members,
+        prefs,
+        result: null,
+        privates: {},
+      };
+      write(d);
+      return code;
+    },
     async getRoom(code) {
       return read().rooms[code]?.room || null;
     },

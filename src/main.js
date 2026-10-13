@@ -30,6 +30,13 @@ function playAnim(sel, cls, ms = 600) {
   el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
   setTimeout(() => el.classList.remove(cls), ms);
 }
+/** 일의 양은 역할이 사람보다 많아 한 사람이 역할을 여러 개 맡아야 할 때만 쓴다 */
+function loadOn(roles) {
+  const people = S?.room?.capacity || S?.members?.length || 0;
+  if (!people) return false;
+  return (roles || []).reduce((a, r) => a + Math.max(1, Math.min(+r.need || 1, people)), 0) > people;
+}
+const needText = (r, on) => `${r.need}명${on ? ` · 일의 양 ${LOAD_LABEL[r.load] || '중'}` : ''}`;
 const home = { capacity: null, selected: new Map(TEMPLATES.slice(0, 4).map((t) => [t.name, t.load])), custom: [], roomName: '' };
 
 function toast(msg) {
@@ -116,6 +123,25 @@ function wordmark(id) {
   return `<svg viewBox="25 0 185 100" class="wm-svg" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" x2="235" y1="0" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7A6BE0"/><stop offset=".40" stop-color="#7A6BE0"/><stop offset=".60" stop-color="#F2B134"/><stop offset="1" stop-color="#F2B134"/></linearGradient></defs><text x="117.5" y="82" text-anchor="middle" font-family="Dongle,Jua,sans-serif" font-size="112" letter-spacing="-1" fill="url(#${id})" stroke="url(#${id})" stroke-width="1.8" stroke-linejoin="round">마타바</text></svg>`;
 }
 
+/* ---------------- 혼자 체험하기 (연습 모드 전용) ---------------- */
+const SOLO_BOTS = [
+  { nickname: '지은', avatar: 'M_happy', message: '잘 부탁드려요!', want: ['팀장'], avoid: ['발표'] },
+  { nickname: '민수', avatar: 'T_wink', want: ['발표'], avoid: ['PPT·디자인'] },
+  { nickname: '채연', avatar: 'M_think', want: ['PPT·디자인'], avoid: ['팀장'] },
+];
+async function startSolo() {
+  const roles = normalizeRoles(['팀장', '발표', '자료 조사', 'PPT·디자인'].map((nm, i) => ({
+    id: `r${i + 1}`, name: nm, need: 1, load: TEMPLATES.find((t) => t.name === nm).load, kind: kindFromName(nm) || '', desc: '', tasks: [],
+  })));
+  const idOf = (nm) => roles.find((r) => r.name === nm)?.id;
+  const bots = SOLO_BOTS.map((b) => ({
+    nickname: b.nickname, avatar: b.avatar, message: b.message,
+    prefs: Object.fromEntries([...b.want.map((n) => [idOf(n), 'want']), ...b.avoid.map((n) => [idOf(n), 'avoid'])]),
+  }));
+  const code = await store.createSoloRoom({ roles, nickname: savedNick() || '방장', name: '체험용 팀플', avatar: savedAvatar() || 'M_base', bots });
+  location.hash = `#/room/${code}`;
+}
+
 function renderStart() {
   cleanup();
   $app.innerHTML = `
@@ -134,6 +160,7 @@ function renderStart() {
         <button type="button" class="start-card" id="go-create"><span class="sc-ic mata"><img src="/mata-s.png" alt="" /></span>방 만들기</button>
         <button type="button" class="start-card" id="go-join"><span class="sc-ic taba"><img src="/taba-s.png" alt="" /></span>방 참여하기</button>
       </div>
+      ${store?.mode === 'demo' ? '<button type="button" class="solo-card" id="go-solo"><b>혼자 체험하기</b><small>가상 팀원 3명이 미리 선호를 냈어요. 나는 방장이 돼요</small></button>' : ''}
       ${recentRooms().length ? `<section class="recent" aria-label="최근 들어간 방"><h2>최근 들어간 방</h2>${recentRooms().slice(0, 3).map((r) => `<div class="recent-row"><button type="button" class="recent-go" data-code="${esc(r.code)}"><b>${esc(r.name || '이름 없는 방')}</b><small>${esc(r.code)}</small></button><button type="button" class="x recent-del" data-code="${esc(r.code)}" aria-label="${esc(r.name || r.code)} 목록에서 지우기">✕</button></div>`).join('')}</section>` : ''}
       <button type="button" class="about-link" id="go-about">마타·타바는 누구예요?</button>
     </main>`;
@@ -142,6 +169,7 @@ function renderStart() {
   $app.querySelector('#go-about').addEventListener('click', () => (location.hash = '#/about'));
   $app.querySelector('#go-create').addEventListener('click', () => (location.hash = '#/create'));
   $app.querySelector('#go-join').addEventListener('click', () => (location.hash = '#/join'));
+  $app.querySelector('#go-solo')?.addEventListener('click', (e) => { e.currentTarget.disabled = true; startSolo().catch((err) => { console.error(err); toast('체험 방을 만들지 못했어요'); e.currentTarget.disabled = false; }); });
 }
 
 
@@ -238,7 +266,7 @@ function renderCreate() {
       </div>
       <div>
         <label for="nick">내 닉네임 <span class="tag req">필수</span><span class="cnt" id="cnt-nick"></span></label>
-        <div class="nick-row"><button type="button" class="av-btn" data-av-toggle="draft" aria-label="프로필 캐릭터 고르기">${avatarHtml(draftAv)}<i class="av-edit" aria-hidden="true">✎</i></button><input id="nick" type="text" maxlength="12" placeholder="예: 정민" value="${esc(savedNick())}" autocomplete="off" /></div>
+        <div class="nick-row"><button type="button" class="av-btn" data-av-toggle="draft" aria-label="프로필 캐릭터 고르기">${avatarHtml(draftAv)}<i class="av-edit" aria-hidden="true">✎</i></button><input id="nick" type="text" maxlength="12" placeholder="예: 홍길동" value="${esc(savedNick())}" autocomplete="off" /></div>
         <div class="avp-wrap" id="avp-draft" hidden>${avatarPickerHtml(draftAv, 'draft')}</div>
         <p class="err" id="err-nick" hidden>닉네임을 입력해 주세요</p>
       </div>
@@ -543,7 +571,7 @@ function renderJoin() {
     <div class="avp-wrap" id="avp-draft" hidden>${avatarPickerHtml(draftAv, 'draft')}</div>
     ${assigned() ? '<p class="notice">이미 배정이 끝난 방이에요. 지금 들어가도 이번 배정에는 포함되지 않아요.</p>' : ''}
     <button type="button" class="btn big" id="do-join">들어가기</button>
-    <div class="jn-roles"><p class="muted">이번에 정할 역할</p><div class="chips">${jroles.map((r) => `<span class="chip">${roleIcon(r, 15)}${esc(r.name)} ${esc(r.need)}명 · 일의 양 ${esc(LOAD_LABEL[r.load] || '중')}</span>`).join('')}</div></div>`;
+    <div class="jn-roles"><p class="muted">이번에 정할 역할</p><div class="chips">${jroles.map((r) => `<span class="chip">${roleIcon(r, 15)}${esc(r.name)} ${esc(needText(r, loadOn(jroles)))}</span>`).join('')}</div></div>`;
 }
 
 function renderRoles() {
@@ -561,7 +589,7 @@ function renderRoles() {
       <section class="card">
         <h2>이번에 정할 역할</h2>
         <div class="stack" style="margin-top:10px">
-          ${roles.map((r) => `<div><b>${esc(r.name)}</b> <span class="tag">${esc(r.need)}명</span><span class="tag">일의 양 ${esc(LOAD_LABEL[r.load] || '중')}</span>${r.desc ? `<p class="role-desc">${esc(r.desc)}</p>` : ''}</div>`).join('')}
+          ${roles.map((r) => `<div><b>${esc(r.name)}</b> <span class="tag">${esc(needText(r, loadOn(roles)))}</span>${r.desc ? `<p class="role-desc">${esc(r.desc)}</p>` : ''}</div>`).join('')}
         </div>
         ${isCreator() ? '' : '<p class="muted small" style="margin-top:10px">역할은 방장이 정해요.</p>'}
       </section>`;
@@ -583,7 +611,7 @@ function drawRolesEditor(el) {
             <select class="r-need" aria-label="필요 인원">${[1, 2, 3].map((n) => `<option value="${n}" ${r.need === n ? 'selected' : ''}>${n}명</option>`).join('')}</select>
             <button type="button" class="x r-del" aria-label="${esc(r.name || '이 역할')} 삭제">✕</button>
           </div>
-          <div class="role-load"><label>일의 양 <span class="muted small">(대략적인 무게)</span></label><select class="r-load" aria-label="일의 양">${[1, 2, 3].map((n) => `<option value="${n}" ${(r.load || 2) === n ? 'selected' : ''}>${LOAD_LABEL[n]}</option>`).join('')}</select></div>
+          ${loadOn(d) ? `<div class="role-load"><label>일의 양</label><div class="seg" role="radiogroup" aria-label="일의 양">${[1, 2, 3].map((n) => `<button type="button" role="radio" aria-checked="${(r.load || 2) === n}" class="seg-b${(r.load || 2) === n ? ' on' : ''}" data-load="${n}">${LOAD_LABEL[n]}</button>`).join('')}</div></div>` : ''}
           <details class="role-more" data-rid="${esc(r.id)}" ${S.rolesOpen.has(r.id) ? 'open' : ''}>
             <summary>더보기 (설명 · 할 일) ${moreBadge(r)}</summary>
             <div class="stack role-more-body">
@@ -748,11 +776,10 @@ function prefsCardHtml(roles) {
           <div class="tile l" style="background:${tileBgOf(r)}">${roleIcon(r, 46)}</div>
           <h2 class="pf-name">${esc(r.name)}</h2>
           ${r.desc ? `<p class="pf-desc">${esc(r.desc)}</p>` : ''}
-          <p class="pf-load">일의 양 <b>${esc(LOAD_LABEL[r.load] || '중')}</b></p>
           <button type="button" class="pf-duty" data-act="sheet">▸ 할 일 보기</button>
           ${chips.length ? `<div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}
           ${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}
-          ${KIND_MBTI[kind] ? `<div class="pf-mbti"><span class="pm-label">어울리는 MBTI</span><div class="pm-row">${KIND_MBTI[kind].map((m) => `<b>${m}</b>`).join('')}</div><small>내 선택이 우선이에요, 참고만 해요</small></div>` : ''}
+          ${KIND_MBTI[kind] ? `<div class="pf-mbti"><span class="pm-label">추천 MBTI</span><div class="pm-row">${KIND_MBTI[kind].map((m) => `<b>${m}</b>`).join('')}</div></div>` : ''}
         </div>
       </div>
       <div class="pf-opts" role="radiogroup" aria-label="${esc(r.name)} 선호">
@@ -1014,17 +1041,10 @@ function whyInfo(pf, body) {
     };
   }
   if (body.includes('원하는 대로')) return { short: '원하는 대로 배정됐어요', detail: '하고 싶은 사람이 자리 수를 넘지 않았어요.' };
-  if (body.includes('무작위')) return { short: '랜덤으로 지정됐어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었고, ` : ''}선호 만족이 같은 조합이 여러 개여서 일의 양 균형과 무작위로 정했어요.` };
+  if (body.includes('무작위')) return { short: '랜덤으로 지정됐어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었고, ` : ''}선호 만족이 같은 조합이 여러 개여서 무작위로 정했어요.` };
   if (body.includes('가장 크게 만족')) return { short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `하고 싶은 사람이 ${n || '여러'}명이어서, 팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐어요.` };
   if (body.includes('같은 규칙을 적용')) return { short: '팀 전체 규칙에 따라 배정됐어요', detail: '모두에게 같은 순서로 규칙을 적용했어요. 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화.' };
   return null;
-}
-/** 일의 양: 숫자 대신 막대. 가운데(50)가 팀 평균, 오른쪽이면 평균보다 많아요 */
-function loadBarHtml(mine, avg) {
-  const ratio = avg > 0 ? mine / avg : 1;
-  const pos = Math.max(4, Math.min(100, ratio * 50));
-  const word = ratio >= 1.25 ? '팀 평균보다 많은 편이에요' : ratio <= 0.75 ? '팀 평균보다 적은 편이에요' : '팀 평균과 비슷해요';
-  return `<div class="lbar" role="img" aria-label="${esc(word)}"><div class="lbar-track"><i style="width:${pos}%"></i><b class="lbar-mid"></b></div><div class="lbar-ticks"><span>0</span><span>50<em>팀 평균</em></span><span>100</span></div></div><p class="why-one">${esc(word)}</p>`;
 }
 function whyItemsHtml(lines) {
   const out = [];
@@ -1033,9 +1053,7 @@ function whyItemsHtml(lines) {
     const m = String(l).match(/^(.+?) · (.+?) — (.*)$/s);
     if (!m) { out.push(`<li><p>${esc(l)}</p></li>`); continue; }
     if (m[1] === '일의 양') {
-      const mine = m[2].match(/([\d.]+)점/);
-      const avg = m[3].match(/([\d.]+)점/);
-      if (mine && avg) out.push(`<li class="why-load"><div class="why-h"><b>일의 양</b></div>${loadBarHtml(+mine[1], +avg[1])}<details class="why-more"><summary>평균이 뭐예요?</summary><p>팀원 1명이 맡은 일의 양 합계를 평균낸 값이에요. 가운데 선이 그 평균이에요.</p></details></li>`);
+      if (!m[2].includes('점')) out.push(`<li class="why-load"><div class="why-h"><b>일의 양</b></div><p class="why-one">${esc(m[2])}</p><p class="muted small">${esc(m[3])}</p></li>`);
       continue;
     }
     const pc = m[2].includes('피하고') ? 'avoid' : m[2].includes('하고 싶') ? 'want' : 'ok';
@@ -1065,7 +1083,7 @@ const drawCount = (k = 1) => Math.min(8, Math.max(3, (S.room?.roles || []).lengt
 /** 동점(무작위)으로 정해진 내 역할이 있고 아직 확인 전이면 { duties(내 역할 전부), names(무작위로 정해진 역할), key }. 아니면 null.
  *  무작위로 정해진 사람만 뽑기를 한다. 나머지는 바로 팀 결과를 본다. 방 전체가 같은 한 가지 방식(DRAW_GAME)을 쓴다. */
 function pendingDraw(r, duties) {
-  if (!S.priv || !duties.length || duties.length >= 7) return null;
+  if (!S.priv || duties.length !== 1) return null; // 맡은 역할이 둘 이상이면 일의 양으로 짝지어진 결과라 뽑을 게 없다
   const key = `${S.code}:${r.round || 1}:${store.uid}`;
   if (S.drawn.has(key)) return null;
   const rnd = new Set();
@@ -1109,7 +1127,7 @@ function drawHtml(pd, r) {
   const n = drawCount(k);
   const prog = (c) => (k > 1 ? ` (${c}/${k})` : '');
   const nm = pd.names.map((x) => `‘${esc(x)}’`).join(', ');
-  const reasonHtml = `<p class="muted draw-why">${nm} 역할은 선호가 같은 사람이 여러 명이라, 마지막 규칙(무작위)으로 정했어요.<br>결과는 이미 정해져 있고, ${DRAW_GAME === 'ladder' ? '사다리를 타며' : '카드를 뒤집어'} 확인해요.${k > 1 ? `<br>맡은 역할이 ${k}개라서 ${k}번 해요.` : ''}</p>`;
+  const reasonHtml = `<p class="muted draw-why"><span>${nm} 역할은 선호가 같은 사람이 여러 명이라<br>무작위로 정했어요.</span><span>결과는 이미 정해져 있어요.<br>${DRAW_GAME === 'ladder' ? '사다리를 타며' : '카드를 뒤집어'} 확인해요.</span></p>`;
   let title = '같은 조건이라 무작위로 정해졌어요';
   let body = '';
   if (st.step === 'pick') {
@@ -1258,7 +1276,7 @@ function renderResult() {
   const myId = store.uid;
   const s = r.summary || {};
   const person = (m) => {
-    const msg = msgOf(m.uid);
+    const msg = msgOf(m.uid); // 한 사람이 역할을 여러 개 맡으면 각 역할 칸에 한마디도 함께 보인다
     const ci = Math.max(0, S.members.findIndex((x) => x.uid === m.uid));
     return `<span class="person"><span class="member ${m.uid === myId ? 'me' : ''}">${avatarHtml(avOfUid(m.uid), 'av')}${esc(m.nickname)}${m.uid === myId ? ' <span class="me-tag">나</span>' : ''}</span>${msg ? `<small class="msg"><span>${esc(msg)}</span></small>` : ''}</span>`;
   };
@@ -1270,7 +1288,7 @@ function renderResult() {
           .map(
             (role, ri) => `
           <div class="role-card rc-col">
-            <div class="role-head"><span class="rc-name"><span class="tile" style="background:${tileBgOf(role)};width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><b>${esc(role.name)}</b> <span class="tag">${esc(role.need)}명</span><span class="tag">일의 양 ${esc(LOAD_LABEL[role.load] || '중')}</span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
+            <div class="role-head"><span class="rc-name"><span class="tile" style="background:${tileBgOf(role)};width:40px;height:40px;border-radius:14px">${roleIcon(role, 24)}</span><span class="rc-title"><b>${esc(role.name)}</b><span class="rc-tags">${loadOn(r.roles) ? `<span class="tag">일의 양 ${esc(LOAD_LABEL[role.load] || '중')}</span>` : ''}</span></span></span>${me() ? `<button type="button" class="role-link" data-role-card="${esc(role.id)}">역할 카드 ▸</button>` : ''}</div>
             <div class="names">${role.members.length ? role.members.map(person).join('') : '<span class="muted small">배정된 사람이 없어요</span>'}</div>
           </div>`,
           )
@@ -1375,12 +1393,22 @@ function attachDelegates() {
       return;
     }
   });
+  rolesEl.addEventListener('click', (e) => {
+    const sb = e.target.closest('.seg-b');
+    const blk = sb && sb.closest('.role-block');
+    if (!blk) return;
+    S.rolesDraft[+blk.dataset.i].load = +sb.dataset.load;
+    blk.querySelectorAll('.seg-b').forEach((x) => { const on = x === sb; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+  });
   rolesEl.addEventListener('change', (e) => {
     const blk = e.target.closest('.role-block');
     if (!blk) return;
     const r = S.rolesDraft[+blk.dataset.i];
-    if (e.target.classList.contains('r-need')) r.need = +e.target.value;
-    if (e.target.classList.contains('r-load')) r.load = +e.target.value;
+    if (e.target.classList.contains('r-need')) {
+      const before = loadOn(S.rolesDraft);
+      r.need = +e.target.value;
+      if (loadOn(S.rolesDraft) !== before) drawRolesEditor(rolesEl);
+    }
     if (e.target.classList.contains('r-kind')) {
       r.kind = e.target.value;
       S.rolesOpen.add(r.id);
@@ -1751,6 +1779,9 @@ async function boot() {
   }
   bindAvatarClicks();
   window.addEventListener('hashchange', route);
+  if (new URLSearchParams(location.search).has('solo') && store.mode === 'demo' && !location.hash.startsWith('#/room')) {
+    try { await startSolo(); return; } catch (e) { console.error(e); }
+  }
   route();
 }
 boot();

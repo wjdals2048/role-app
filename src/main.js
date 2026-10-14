@@ -1027,24 +1027,44 @@ const msgOf = (uid) => normalizeMessage(S.members.find((m) => m.uid === uid)?.me
 
 /** 내 결과 화면: 내 역할 · 배정 이유 · 한마디 */
 /** 배정 이유: 한 줄 요약 + "자세히 보기"(요약과 겹치지 않는 근거만) */
-function whyInfo(pf, body) {
+function whyInfo(pf, body0, stat) {
+  const body = body0;
   const n = (body.match(/하고 싶은 사람이 (\d+)명/) || [])[1];
+  const need = stat ? stat.need : 1;
+  const w1 = stat ? stat.w + 1 : null; // 나를 포함해 하고 싶다고 한 사람 수
+  const a = stat ? stat.a : 0;
   if (body.startsWith('이번에는 맡지 못했어요')) {
     const rest = body.replace(/^이번에는 맡지 못했어요\.\s*/, '');
-    return { short: rest.includes('무작위') ? '동점이어서 랜덤으로 정해졌어요' : '이번에는 맡지 못했어요', detail: rest };
+    if (rest.includes('무작위')) return { short: '동점이어서 랜덤으로 정해졌어요', detail: stat ? `자리 ${need}개 · 하고 싶은 사람 ${w1}명\n선호 만족이 같은 조합이 여러 개여서 무작위로 정했어요` : rest };
+    const holders = (rest.match(/다른 팀원 (\d+)명이 맡고/) || [])[1];
+    const rules = [...rest.matchAll(/\d순위\("([^"]+)"\)/g)].map((m) => m[1]);
+    const lines = [];
+    if (stat) lines.push(`자리 ${need}개 · 하고 싶은 사람 ${w1}명`);
+    if (holders) lines.push(`지금은 다른 팀원 ${holders}명이 맡고 있어요`);
+    if (rules.length) lines.push(`"${rules.join('", "')}" 규칙을 우선해서 지금 조합이 선택됐어요`);
+    return { short: stat ? `자리 ${need}개에 하고 싶은 사람이 ${w1}명이라, 이번에는 다른 팀원이 맡았어요` : '이번에는 다른 팀원이 맡았어요', detail: lines.length ? lines.join('\n') : rest };
   }
   if (pf === 'avoid') {
     const rnd = body.includes('무작위');
     return {
-      short: rnd ? '"피하고 싶어요"가 가장 적은 조합 중 랜덤으로 지정됐어요' : '팀 전체에서 "피하고 싶어요"가 가장 적은 조합이에요',
-      detail: '모두의 선호를 비교해서 피하고 싶은 배정이 가장 적은 조합을 골랐어요. 이 역할은 그 조합에서 다른 팀원이 맡을 수 없었어요.' + (rnd ? ' 같은 조건의 조합이 여러 개여서 그중 하나를 무작위로 골랐어요.' : ''),
+      short: rnd ? '"피하고 싶어요"가 가장 적은 조합 중 랜덤으로 지정됐어요' : '모두의 "피하고 싶어요"를 합쳤을 때 가장 적은 조합이에요',
+      detail: '팀 전체의 "피하고 싶어요" 배정을 가장 적게 만든 조합이에요\n이 역할을 맡을 수 있는 다른 팀원이 없었어요' + (rnd ? '\n같은 조건의 조합이 여러 개여서 그중 하나를 랜덤으로 골랐어요' : ''),
     };
   }
-  if (body.includes('원하는 대로')) return { short: '원하는 대로 배정됐어요', detail: '하고 싶은 사람이 자리 수를 넘지 않았어요.' };
+  if (body.includes('원하는 대로')) return { short: '원하는 대로 배정됐어요', detail: stat ? `자리 ${need}개 · 하고 싶은 사람 ${w1}명\n자리가 모자라지 않아서 경쟁 없이 배정됐어요` : '하고 싶은 사람이 자리 수를 넘지 않았어요.' };
   if (body.includes('무작위')) return { short: '랜덤으로 지정됐어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었고, ` : ''}선호 만족이 같은 조합이 여러 개여서 무작위로 정했어요.` };
-  if (body.includes('가장 크게 만족')) return { short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `하고 싶은 사람이 ${n || '여러'}명이어서, 팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐어요.` };
-  if (body.includes('같은 규칙을 적용')) return { short: '팀 전체 규칙에 따라 배정됐어요', detail: '모두에게 같은 순서로 규칙을 적용했어요. 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화.' };
+  if (body.includes('가장 크게 만족')) return { short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `자리 ${need}개 · 하고 싶은 사람 ${n || '여러'}명\n팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐더니 내가 배정됐어요` };
+  if (body.includes('같은 규칙을 적용')) {
+    const why = !stat ? '' : stat.w === 0 && a === 0 ? '하고 싶다는 팀원도, 피하고 싶다는 팀원도 없었어요\n' : stat.w === 0 ? `하고 싶다는 팀원은 없고 피하고 싶다는 팀원이 ${a}명이었어요\n` : `하고 싶다는 팀원 ${stat.w}명은 다른 역할을 맡는 쪽이 팀 전체에 더 좋았어요\n`;
+    return { short: stat && stat.w === 0 ? '하고 싶다는 팀원이 없어서 배정됐어요' : '팀 전체 규칙에 따라 배정됐어요', detail: why + '규칙 순서: 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화' };
+  }
   return null;
+}
+function statChipsHtml(stat) {
+  // 팀원이 적으면(나 빼고 3명 미만) 숫자만으로 누가 골랐는지 짐작할 수 있어서 보여 주지 않는다
+  if (!stat || stat.w + stat.o + stat.a < 3) return '';
+  const c = (cls, label, n) => `<span class="tg pf-${cls}">${label} ${n}</span>`;
+  return `<div class="why-stat"><small>다른 팀원들의 선택(명)</small>${c('want', '하고 싶어요', stat.w)}${c('ok', '상관없어요', stat.o)}${c('avoid', '피하고 싶어요', stat.a)}</div>`;
 }
 function whyItemsHtml(lines) {
   const out = [];
@@ -1057,13 +1077,17 @@ function whyItemsHtml(lines) {
       continue;
     }
     const pc = m[2].includes('피하고') ? 'avoid' : m[2].includes('하고 싶') ? 'want' : 'ok';
-    const info = whyInfo(pc, m[3]);
+    const sm = m[3].match(/⟦(\d+),(\d+),(\d+),(\d+)⟧\s*$/);
+    const stat = sm ? { w: +sm[1], o: +sm[2], a: +sm[3], need: +sm[4] } : null;
+    m[3] = m[3].replace(/⟦[^⟧]*⟧\s*$/, '');
+    const info = whyInfo(pc, m[3], stat);
+    if (info) info.stat = stat;
     if (!info) { out.push(`<li><div class="why-h"><b>${esc(m[1])}</b><span class="tg pf-${pc}">${esc(m[2])}</span></div><p>${esc(m[3])}</p></li>`); continue; }
-    const key = `${pc}|${info.short}|${info.detail}`;
+    const key = `${pc}|${info.short}|${info.detail}|${m[1]}`;
     if (!groups.has(key)) { const g = { names: [], pc, label: m[2], info }; groups.set(key, g); out.push(g); }
     groups.get(key).names.push(m[1]);
   }
-  const rows = out.map((o) => (typeof o === 'string' ? o : `<li><div class="why-h"><b>${esc(o.names.join(' · '))}</b><span class="tg pf-${o.pc}">${esc(o.label)}</span></div><p class="why-one">${esc(o.info.short)}</p><details class="why-more"><summary>자세히 보기</summary><p>${esc(o.info.detail)}</p></details></li>`));
+  const rows = out.map((o) => (typeof o === 'string' ? o : `<li><div class="why-h"><b>${esc(o.names.join(' · '))}</b><span class="tg pf-${o.pc}">${esc(o.label)}</span></div><p class="why-one">${esc(o.info.short)}</p>${statChipsHtml(o.info.stat)}<details class="why-more"><summary>자세히 보기</summary><ul class="why-bul">${String(o.info.detail).split('\n').map((t) => `<li>${esc(t)}</li>`).join('')}</ul></details></li>`));
   const load = rows.filter((r) => r.includes('why-load'));
   return rows.filter((r) => !r.includes('why-load')).concat(load).join('');
 }

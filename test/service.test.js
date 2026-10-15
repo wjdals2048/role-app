@@ -87,7 +87,7 @@ test('비공개 설명은 본인 것만 만들어지고 다른 사람의 선호�
 test('입력 정리: 이상한 값과 긴 글을 걸러낸다', () => {
   const roles = normalizeRoles([{ name: ' 발표 ', need: 9, load: 0 }, { name: '' }]);
   assert.equal(roles.length, 1);
-  assert.equal(roles[0].need, 3); assert.equal(roles[0].load, 2);
+  assert.equal(roles[0].need, 8); assert.equal(roles[0].load, 2); // 필요 인원은 최대 8명
   const p = normalizePrefs({ prefs: { r1: 'hack' }, strength: 'a'.repeat(100), share: 'yes' }, [{ id: 'r1' }]);
   assert.equal(p.prefs.r1, 'ok'); assert.equal(p.strength.length, 40); assert.equal(p.share, false);
 });

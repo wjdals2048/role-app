@@ -1,6 +1,6 @@
 import './style.css';
 import { createStore } from './store.js';
-import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, normalizeCapacity, CAPACITY_MIN, CAPACITY_MAX , LOAD_LABEL } from '../lib/roomService.js';
+import { normalizePrefs, normalizeRoles, normalizeTasks, normalizeRoomName, isNicknameTaken, normalizeMessage, MESSAGE_MAX, normalizeCapacity, CAPACITY_MIN, CAPACITY_MAX, NEED_MAX, LOAD_LABEL } from '../lib/roomService.js';
 import { AVATAR_IDS, AVATAR_BG, AVATAR_LABEL, validAvatar, defaultAvatar } from '../lib/avatars.js';
 import { TRAITS, relevantTraits, suggestPrefs } from '../lib/traits.js';
 import { makeLadder, walkLadder } from '../lib/ladder.js';
@@ -472,7 +472,7 @@ const assigned = () => S.room?.status === 'assigned';
 
 async function openRoom(code, view = 'hub') {
   cleanup();
-  S = { code, view, room: null, members: [], result: null, priv: null, rolesDraft: null, rolesOpen: new Set(), rolesSig: '', prefsSig: '', form: null, cardRole: null, editGuide: false, confirmReopen: false, pIdx: null, editOne: false, sheet: false, traits: new Set(), touched: new Set(), prefsLoaded: false, busy: false, confirmAssign: false, confirmSlots: false, capEdit: false, draw: null, drawn: loadDrawn(), qa: qaFor(code), loaded: false };
+  S = { code, view, manual: new Set(), room: null, members: [], result: null, priv: null, rolesDraft: null, rolesOpen: new Set(), rolesSig: '', prefsSig: '', form: null, cardRole: null, editGuide: false, confirmReopen: false, pIdx: null, editOne: false, sheet: false, traits: new Set(), touched: new Set(), prefsLoaded: false, busy: false, confirmAssign: false, confirmSlots: false, capEdit: false, draw: null, drawn: loadDrawn(), qa: qaFor(code), loaded: false };
   roomShell(code);
   const status = $app.querySelector('#s-status');
   status.innerHTML = '<span class="muted"><span class="spinner"></span>방을 불러오는 중…</span>';
@@ -678,7 +678,7 @@ function drawRolesEditor(el) {
           <div class="role-edit">
             <button type="button" class="tile r-icon" data-open="1" aria-label="아이콘 바꾸기" style="background:${tileBgOf(r)}">${roleIcon(r, 28)}</button>
             <input type="text" class="r-name" maxlength="20" value="${esc(r.name)}" aria-label="역할 이름" ${S.room.roles.some((x) => x.id === r.id) ? 'readonly title="저장된 역할의 이름은 고칠 수 없어요. 바꾸려면 삭제하고 새로 추가해 주세요."' : ''} />
-            <select class="r-need" aria-label="필요 인원">${[1, 2, 3].map((n) => `<option value="${n}" ${r.need === n ? 'selected' : ''}>${n}명</option>`).join('')}</select>
+            <select class="r-need" aria-label="필요 인원">${Array.from({ length: NEED_MAX }, (_, i) => i + 1).map((n) => `<option value="${n}" ${r.need === n ? 'selected' : ''}>${n}명</option>`).join('')}</select>
             <button type="button" class="x r-del" aria-label="${esc(r.name || '이 역할')} 삭제">✕</button>
           </div>
           ${loadOn(d) ? `<div class="role-load"><label>일의 양</label><div class="seg" role="radiogroup" aria-label="일의 양">${[1, 2, 3].map((n) => `<button type="button" role="radio" aria-checked="${(r.load || 2) === n}" class="seg-b${(r.load || 2) === n ? ' on' : ''}" data-load="${n}">${LOAD_LABEL[n]}</button>`).join('')}</div></div>` : ''}
@@ -781,7 +781,7 @@ async function renderPrefs() {
   if (!S.form) return;
   const roles = S.room.roles;
   for (const r of roles) if (!(r.id in S.form.prefs)) S.form.prefs[r.id] = 'ok';
-  const sig = JSON.stringify([roles, S.form.saved === true, S.pIdx, S.editOne, S.sheet, [...S.traits], S.form.prefs, S.form.randomConsent, S.qa]);
+  const sig = JSON.stringify([roles, S.form.saved === true, S.pIdx, S.editOne, S.sheet, [...S.traits], S.form.prefs, S.form.randomConsent, S.qa, [...S.manual]]);
   if (sig === S.prefsSig) return;
   S.prefsSig = sig;
   S.traits = new Set([...S.traits].filter((id) => relevantTraits(roles).some((t) => t.id === id))); // 없어진 역할의 칩은 해제
@@ -1017,6 +1017,15 @@ function askBoxHtml(r, kind, flat = false) {
   return `<details class="pf-ask"${answered ? ' open' : ''}><summary>질문 3개로 제안 받기</summary>${body}${note}</details>`;
 }
 
+/** 직접 고른 역할은 '선택이 어렵다면' 안의 문장·질문을 누를 수 없게 잠근다. 다시 켜기로 풀 수 있다. */
+function lockHelp(html, locked, rid) {
+  if (!locked) return html;
+  return html
+    .replace('<details class="pf-help"', '<details class="pf-help locked"')
+    .replace(/<button type="button"/g, '<button type="button" disabled')
+    .replace('</summary>', `</summary><p class="pf-lock">직접 골랐어요. 제안은 꺼 뒀어요. <button type="button" class="link" data-unlock="${esc(rid)}">다시 켜기</button></p>`);
+}
+
 function prefsCardHtml(roles) {
   const i = S.pIdx;
   const r = roles[i];
@@ -1026,7 +1035,8 @@ function prefsCardHtml(roles) {
   const kind = kindOfRole(r);
   const chips = chipsOf(r);
   const hint = traitHint(r.id, sug);
-  const helpOpen = S.helpOpen || chips.some((t) => S.traits.has(t.id)) || (S.qa && [0, 1, 2].some((n) => S.qa.ans[`${r.id}:${n}`]));
+  const locked = S.manual.has(r.id); // 직접 고른 역할은 제안(문장·질문)을 잠근다
+  const helpOpen = !locked && (S.helpOpen || chips.some((t) => S.traits.has(t.id)) || (S.qa && [0, 1, 2].some((n) => S.qa.ans[`${r.id}:${n}`])));
   const helpHtml = () => `<details class="pf-help"${helpOpen ? ' open' : ''}><summary>선택이 어렵다면</summary>${chips.length ? `<p class="pf-sub">나와 비슷한 문장을 눌러 보세요</p><div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}${hint ? `<p class="pf-hint ${hint.includes('피하고 싶어요') ? 'avoid' : hint.includes('하고 싶어요') ? 'want' : hint.includes('상관없어요') ? 'ok' : ''}">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}${chips.length && S.qa ? '<p class="pf-or"><span>또는</span></p>' : ''}${askBoxHtml(r, kind, true)}</details>`;
   const last = i === roles.length - 1;
   return `
@@ -1041,7 +1051,7 @@ function prefsCardHtml(roles) {
           <h2 class="pf-name">${esc(r.name)}</h2>
           ${r.desc ? `<p class="pf-desc">${esc(r.desc)}</p>` : ''}
           <button type="button" class="pf-duty" data-act="sheet">▸ 할 일 보기</button>
-          ${chips.length || S.qa ? helpHtml() : ''}
+          ${chips.length || S.qa ? lockHelp(helpHtml(), locked, r.id) : ''}
           <div class="pf-info">${infoMetaHtml(r, roles)}${KIND_FEEL[kind] ? `<div class="pi-rows"><p class="pi-row hard"><b>부담될 수 있어요</b>${esc(KIND_FEEL[kind].hard)}</p><p class="pi-row good"><b>보람찰 수 있어요</b>${esc(KIND_FEEL[kind].good)}</p></div>` : ''}</div>
         </div>
       </div>
@@ -1205,7 +1215,9 @@ function dutyBodyHtml(role) {
   const isMine = (S.priv?.roleIds || []).includes(role.id);
   const multi = (role.members || []).length >= 2;
   const canTag = multi && !!me();
-  const filter = multi && isMine && S.shareFilter === 'mine' ? 'mine' : 'all';
+  // 남이 맡은 할 일이 하나라도 있어야 '전체/내 몫'이 서로 달라진다. 아니면 탭이 같은 화면이라 숨긴다.
+  const canFilter = multi && isMine && d.tasks.some((t) => !mineTask(role, t));
+  const filter = canFilter && S.shareFilter === 'mine' ? 'mine' : 'all';
   const tagHtml = (t, i) => {
     const o = ownersOfTask(role, t);
     const label = ownerLabel(role, t);
@@ -1225,9 +1237,9 @@ function dutyBodyHtml(role) {
   const shown = (isMine
     ? `<ul class="plain chk-list">${rows.map(({ t, i }) => `<li class="${isChecked(role.id, t) ? 'done' : ''}"><div class="chk-row"><label class="chk"><input type="checkbox" data-rid="${esc(role.id)}" data-t="${esc(t)}" ${isChecked(role.id, t) ? 'checked' : ''} /><span>${esc(t)}</span></label>${multi ? tagHtml(t, i) : ''}</div>${multi ? pickerHtml(t, i) : ''}</li>`).join('')}</ul>`
     : `<ul class="plain">${rows.map(({ t, i }) => `<li><div class="chk-row"><span class="chk-plain">${esc(t)}</span>${multi ? tagHtml(t, i) : ''}</div>${multi ? pickerHtml(t, i) : ''}</li>`).join('')}</ul>`);
-  const countTasks = multi && isMine ? d.tasks.filter((t) => mineTask(role, t)) : d.tasks;
+  const countTasks = canFilter ? d.tasks.filter((t) => mineTask(role, t)) : d.tasks;
   const doneN = countTasks.filter((t) => isChecked(role.id, t)).length;
-  const progLabel = multi && isMine ? `내 몫 ${countTasks.length}개 중 ${doneN}개 완료` : `${doneN}/${countTasks.length} 완료`;
+  const progLabel = canFilter ? `내 몫 ${countTasks.length}개 중 ${doneN}개 완료` : `${doneN}/${countTasks.length} 완료`;
   return `
     <article class="duty" style="--rc:${tileBgOf(role)}">
       <header class="duty-head">
@@ -1238,7 +1250,7 @@ function dutyBodyHtml(role) {
       ${
         d.tasks.length
           ? `<div class="phase"><div class="row between"><h4>할 일</h4>${isMine ? `<span class="muted small" id="chk-prog">${progLabel}</span>` : ''}</div>
-            ${multi && isMine ? `<div class="own-seg" role="tablist"><button type="button" role="tab" class="${filter === 'all' ? 'on' : ''}" data-f="all">전체</button><button type="button" role="tab" class="${filter === 'mine' ? 'on' : ''}" data-f="mine">내 몫</button></div>` : ''}
+            ${canFilter ? `<div class="own-seg" role="tablist"><button type="button" role="tab" class="${filter === 'all' ? 'on' : ''}" data-f="all">전체</button><button type="button" role="tab" class="${filter === 'mine' ? 'on' : ''}" data-f="mine">내 몫</button></div>` : ''}
             ${shown}
             ${multi ? `<p class="muted small">${canTag ? '태그를 누르면 담당을 정할 수 있어요. ' : ''}담당은 같은 역할의 팀원 모두에게 보여요.</p>` : ''}
             ${isMine ? '<p class="muted small">체크는 이 브라우저에만 저장돼요. 다른 팀원에게는 보이지 않아요.</p>' : ''}</div>`
@@ -1855,9 +1867,12 @@ function attachDelegates() {
       else if (m === 'reset') { S.qa.picked = false; S.qa.mode = 'card'; S.pIdx = 0; }
       renderPrefs(); window.scrollTo(0, 0); return;
     }
+    const unlock = e.target.closest('[data-unlock]');
+    if (unlock && S.form) { S.manual.delete(unlock.dataset.unlock); S.helpOpen = true; renderPrefs(); return; }
     const pref = e.target.closest('[data-pref]');
     if (pref && S.form) {
       S.form.prefs[pref.dataset.rid] = pref.dataset.pref;
+      S.manual.add(pref.dataset.rid); S.helpOpen = false;
       S.touched.add(pref.dataset.rid); // 직접 고른 선택은 성향 제안이 덮어쓰지 않는다
       renderPrefs();
       playAnim('.pf-opt.on', 'pop', 450);

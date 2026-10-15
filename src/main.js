@@ -9,6 +9,8 @@ import { QUIZ, ANSWERS, quizFor, suggestFromAnswers } from '../lib/quiz.js';
 import { KINDS, KIND_MBTI, KIND_FEEL, ICON_IDS, DESC_MAX, STEP_MAX, STEP_COUNT, kindFromName, kindOfRole, exampleDesc, templateFor } from '../lib/roleGuide.js';
 
 const $app = document.getElementById('app');
+// "선택이 어렵다면" 접힘 상태를 기억해, 선택을 눌러 화면이 다시 그려져도 열린 채로 둔다
+document.addEventListener('toggle', (e) => { if (e.target?.classList?.contains('pf-help') && typeof S === 'object' && S) S.helpOpen = e.target.open; }, true);
 const $toast = document.getElementById('toast');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const TEMPLATES = [
@@ -765,7 +767,7 @@ const PREF_OPT = [
 ];
 // 선택이 배정에서 어떻게 쓰이는지(규칙 ①→③과 같은 내용). 보장하지 못하는 부분도 함께 적는다.
 const PREF_MEAN = {
-  want: ['하고 싶어요', '이 역할을 맡고 싶다는 표시예요. 하고 싶은 사람이 자리보다 많으면 못 맡을 수도 있어요. 욕심으로 보일 일은 없어요. 다른 팀원에게는 안 보여요.'],
+  want: ['하고 싶어요', '이 역할을 맡고 싶다는 표시예요. 하고 싶은 사람이 자리보다 많으면 못 맡을 수도 있어요. 욕심으로 보일 일은 없어요.'],
   ok: ['상관없어요', '맡게 돼도 괜찮다는 뜻이에요. 다른 팀원의 선택을 맞추면서 자리를 채울 때 이 역할로 정해질 수 있어요.'],
   avoid: ['피하고 싶어요', '배정할 때 가장 먼저 지키는 선택이에요. 다만 모두가 피하면 누군가는 맡아야 해서 꼭 보장하지는 못해요. 이유를 말하지 않아도 돼요.'],
 };
@@ -962,7 +964,7 @@ function infoMetaHtml(r, roles) {
   return parts.length ? `<div class="pi-meta">${parts.map((t) => `<span>${t}</span>`).join('')}</div>` : '';
 }
 
-function askBoxHtml(r, kind) {
+function askBoxHtml(r, kind, flat = false) {
   if (!S.qa) return '';
   const qs = quizFor(r, kind);
   const answered = qs.some((_, n) => S.qa.ans[`${r.id}:${n}`]);
@@ -970,7 +972,9 @@ function askBoxHtml(r, kind) {
     const key = `${r.id}:${n}`; const v = S.qa.ans[key];
     return `<div class="qz-q"><p>${esc(q.q)}</p><div class="qz-btns">${ANSWERS[q.t].map(([a, l]) => `<button type="button" data-q="${esc(key)}" data-a="${a}" aria-pressed="${v === a}" class="${v === a ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
   }).join('');
-  return `<details class="pf-ask"${answered ? ' open' : ''}><summary>질문 3개로 제안 받기</summary>${body}${qaNoteHtml(r, 0) || '<p class="muted small">답하지 않으면 제안하지 않아요. 직접 골라도 돼요.</p>'}</details>`;
+  const note = qaNoteHtml(r, 0) || '<p class="muted small">답하지 않으면 제안하지 않아요. 직접 골라도 돼요.</p>';
+  if (flat) return `<div class="pf-ask flat"><p class="pf-sub">질문 3개에 답해 보세요</p>${body}${note}</div>`;
+  return `<details class="pf-ask"${answered ? ' open' : ''}><summary>질문 3개로 제안 받기</summary>${body}${note}</details>`;
 }
 
 function prefsCardHtml(roles) {
@@ -986,6 +990,8 @@ function prefsCardHtml(roles) {
   const avoidChip = all.find((t) => t.id === 'nervous') || all.find((t) => t.effects[kind] === 'avoid');
   const chips = [wantChip, avoidChip].filter(Boolean);
   const hint = traitHint(r.id, sug);
+  const helpOpen = S.helpOpen || chips.some((t) => S.traits.has(t.id)) || (S.qa && [0, 1, 2].some((n) => S.qa.ans[`${r.id}:${n}`]));
+  const helpHtml = () => `<details class="pf-help"${helpOpen ? ' open' : ''}><summary>선택이 어렵다면</summary><p class="pf-intro">둘 중 하나만 해도 돼요. 제안일 뿐, 선택은 직접 해요.</p>${chips.length ? `<p class="pf-sub">나와 비슷한 문장을 눌러 보세요</p><div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}${chips.length && S.qa ? '<p class="pf-or"><span>또는</span></p>' : ''}${askBoxHtml(r, kind, true)}</details>`;
   const last = i === roles.length - 1;
   return `
     <section class="pf">
@@ -999,16 +1005,14 @@ function prefsCardHtml(roles) {
           <h2 class="pf-name">${esc(r.name)}</h2>
           ${r.desc ? `<p class="pf-desc">${esc(r.desc)}</p>` : ''}
           <button type="button" class="pf-duty" data-act="sheet">▸ 할 일 보기</button>
-          ${chips.length ? `<div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}
-          ${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}
-          ${askBoxHtml(r, kind)}
+          ${chips.length || S.qa ? helpHtml() : ''}
           <div class="pf-info">${infoMetaHtml(r, roles)}${KIND_FEEL[kind] ? `<div class="pi-rows"><p class="pi-row hard"><b>부담될 수 있어요</b>${esc(KIND_FEEL[kind].hard)}</p><p class="pi-row good"><b>뿌듯할 수 있어요</b>${esc(KIND_FEEL[kind].good)}</p></div>` : ''}</div>
         </div>
       </div>
       <div class="pf-opts" role="radiogroup" aria-label="${esc(r.name)} 선호">
         ${PREF_OPT.map(([v, label, ic, cls]) => `<button type="button" role="radio" aria-checked="${f.prefs[r.id] === v}" class="pf-opt ${cls}${f.prefs[r.id] === v ? ' on' : ''}" data-pref="${v}" data-rid="${esc(r.id)}"><span class="ic">${ic}</span>${label}</button>`).join('')}
       </div>
-      <p class="pf-mean${f.prefs[r.id] ? ' ' + f.prefs[r.id] : ''}" aria-live="polite">${f.prefs[r.id] ? `<b>${esc(PREF_MEAN[f.prefs[r.id]][0])}</b> ${esc(PREF_MEAN[f.prefs[r.id]][1])}` : '선택하면 이 선택이 배정에서 어떻게 쓰이는지 알려 드려요.'}</p>
+      <p class="pf-mean${f.prefs[r.id] ? ' ' + f.prefs[r.id] : ''}" aria-live="polite">${f.prefs[r.id] ? PREF_MEAN[f.prefs[r.id]][1].split(/(?<=\.)\s+/).map((t) => `<span class="pm-s">${esc(t)}</span>`).join('') : '선택하면 이 선택이 배정에서 어떻게 쓰이는지 알려 드려요.'}</p>
       <ul class="pf-notes">
         <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.500 10.900c.7.600 1 1.300 1 2.100h5c0-.8.3-1.500 1-2.100A6 6 0 0012 3z"/></svg>위 문구는 제안일 뿐, 직접 고르면 바뀌어요</li>
         <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4452C8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>내 선택은 팀원에게 보이지 않아요</li>
@@ -1261,28 +1265,28 @@ function whyInfo(pf, body0, stat, rname = '') {
   const a = stat ? stat.a : 0;
   if (body.startsWith('이번에는 맡지 못했어요')) {
     const rest = body.replace(/^이번에는 맡지 못했어요\.\s*/, '');
-    if (rest.includes('무작위')) return { tag: '무작위(마지막 단계)', short: '선호를 반영해도 같은 조합이 여럿이어서, 마지막 단계인 무작위로 정했어요', detail: stat ? `자리 ${need}개 · 하고 싶은 사람 ${w1}명\n무작위는 규칙의 마지막 단계에서만 써요` : rest };
+    if (rest.includes('무작위')) return { tag: '무작위(마지막 단계)', steps: [5], short: '선호를 반영해도 같은 조합이 여럿이어서, 마지막 단계인 무작위로 정했어요', detail: stat ? `자리 ${need}개 · 하고 싶은 사람 ${w1}명\n무작위는 규칙의 마지막 단계에서만 써요` : rest };
     const holders = (rest.match(/다른 팀원 (\d+)명이 맡고/) || [])[1];
     const rules = [...rest.matchAll(/\d순위\("([^"]+)"\)/g)].map((m) => m[1]);
     const lines = [];
     if (stat) lines.push(`자리 ${need}개 · 하고 싶은 사람 ${w1}명`);
     if (holders) lines.push(`지금은 다른 팀원 ${holders}명이 맡고 있어요`);
     if (rules.length) lines.push(`"${rules.join('", "')}" 규칙을 우선해서 지금 조합이 선택됐어요`);
-    return { tag: '팀 전체 규칙', short: stat ? `자리 ${need}개에 하고 싶은 사람이 ${w1}명이라, 이번에는 다른 팀원이 맡았어요` : '이번에는 다른 팀원이 맡았어요', detail: lines.length ? lines.join('\n') : rest };
+    return { tag: '팀 전체 규칙', steps: [], holders: holders ? +holders : 0, short: '이번에는 다른 팀원이 맡았어요', detail: lines.length ? lines.join('\n') : rest };
   }
   if (pf === 'avoid') {
     const rnd = body.includes('무작위');
     return {
-      tag: '피하고 싶어요 최소화 규칙', short: '"피하고 싶어요"를 골랐지만 이 역할을 맡게 됐어요',
+      tag: '피하고 싶어요 최소화 규칙', steps: rnd ? [1, 5] : [1], short: '"피하고 싶어요"를 골랐지만 이 역할을 맡게 됐어요',
       detail: '"피하고 싶어요"는 가장 먼저 따지는 규칙이었어요\n팀 전체에서 "피하고 싶어요" 배정이 가장 적은 조합을 골랐더니 이 역할이 포함됐어요' + (rnd ? '\n같은 조건의 조합이 여러 개여서, 마지막 단계인 무작위로 정했어요' : '') + '',
     };
   }
-  if (body.includes('원하는 대로')) return { tag: '선호 반영', short: '원하는 대로 배정됐어요', detail: stat ? `자리 ${need}개 · 하고 싶은 사람 ${w1}명\n자리가 모자라지 않아서 경쟁 없이 배정됐어요` : '하고 싶은 사람이 자리 수를 넘지 않았어요.' };
-  if (body.includes('무작위')) return { tag: '무작위(마지막 단계)', short: '선호를 반영해도 같은 조합이 여럿이어서, 마지막 단계인 무작위로 정했어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었어요\n` : ''}무작위는 규칙의 마지막 단계에서만 써요` };
-  if (body.includes('가장 크게 만족')) return { tag: '팀 전체 선호 반영', short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `자리 ${need}개 · 하고 싶은 사람 ${n || '여러'}명\n팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐더니 내가 배정됐어요` };
+  if (body.includes('원하는 대로')) return { tag: '선호 반영', steps: [3], short: '원하는 대로 배정됐어요', detail: stat ? `자리 ${need}개 · 하고 싶은 사람 ${w1}명\n자리가 모자라지 않아서 경쟁 없이 배정됐어요` : '하고 싶은 사람이 자리 수를 넘지 않았어요.' };
+  if (body.includes('무작위')) return { tag: '무작위(마지막 단계)', steps: [5], short: '선호를 반영해도 같은 조합이 여럿이어서, 마지막 단계인 무작위로 정했어요', detail: `${n ? `하고 싶은 사람이 ${n}명이었어요\n` : ''}무작위는 규칙의 마지막 단계에서만 써요` };
+  if (body.includes('가장 크게 만족')) return { tag: '팀 전체 선호 반영', steps: [3], short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `자리 ${need}개 · 하고 싶은 사람 ${n || '여러'}명\n팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐더니 내가 배정됐어요` };
   if (body.includes('같은 규칙을 적용')) {
     const why = !stat ? '' : stat.w === 0 && a === 0 ? '하고 싶다는 팀원도, 피하고 싶다는 팀원도 없었어요\n' : stat.w === 0 ? `하고 싶다는 팀원은 없고 피하고 싶다는 팀원이 ${a}명이었어요\n` : `하고 싶다는 팀원 ${stat.w}명은 다른 역할을 맡는 쪽이 팀 전체에 더 좋았어요\n`;
-    return { tag: '팀 전체 규칙', short: stat && stat.w === 0 ? (pf === 'ok' ? `‘${rname}’ 역할을 특별히 선호한 팀원이 없어, ‘상관없어요’라고 답한 팀원 중에서 배정했어요` : `‘${rname}’ 역할을 특별히 선호한 팀원이 없어서 배정했어요`) : '팀 전체 규칙에 따라 배정했어요', detail: why + '규칙 순서: 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화' };
+    return { tag: '팀 전체 규칙', steps: [], short: stat && stat.w === 0 ? (pf === 'ok' ? `‘${rname}’ 역할을 특별히 선호한 팀원이 없어, ‘상관없어요’라고 답한 팀원 중에서 배정했어요` : `‘${rname}’ 역할을 특별히 선호한 팀원이 없어서 배정했어요`) : '팀 전체 규칙에 따라 배정했어요', detail: why + '규칙 순서: 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화' };
   }
   return null;
 }
@@ -1297,9 +1301,36 @@ function statBarHtml(stat, pc) {
   if (!stat || stat.w + stat.o + stat.a < 3) return '';
   const seg = (cls, label, n) => (n > 0 ? `<span class="sg ${cls}" style="flex:${n}">${n}</span>` : '');
   const lg = (cls, label) => `<span class="lg"><i class="${cls}"></i>${label}</span>`;
-  return `<div class="why-bar"><div class="wb-head"><small>다른 팀원들의 선택(명)</small><span class="wb-seat">자리 ${esc(stat.need)}개</span></div>
+  return `<div class="why-bar"><div class="wb-head"><small>다른 팀원들의 선택(명)</small></div>
     <div class="wb-track" role="img" aria-label="하고 싶어요 ${stat.w}명, 상관없어요 ${stat.o}명, 피하고 싶어요 ${stat.a}명">${seg('want', '', stat.w)}${seg('ok', '', stat.o)}${seg('avoid', '', stat.a)}</div>
     <div class="wb-legend">${lg('want', '하고 싶어요')}${lg('ok', '상관없어요')}${lg('avoid', '피하고 싶어요')}</div></div>`;
+}
+/** 배정 이유 "자세히 보기": 글 대신 그림으로. 자리 수 · 팀원들의 응답(사람 아이콘) · 결정된 단계 */
+const WHY_STEP_LABEL = ['피하고 싶어요 줄이기', '모두 1개 이상', '하고 싶어요 늘리기', '일의 양 균형', '무작위'];
+const personIcon = (cls = '') => `<svg class="wp ${cls}" viewBox="0 0 24 40" aria-hidden="true"><circle cx="12" cy="8" r="7"/><path d="M2 40V24a10 10 0 0 1 20 0v16z"/></svg>`;
+function whyVisualHtml(info, pc, mine) {
+  const st = info.stat;
+  const steps = info.steps || [];
+  if (!st && !steps.length) return '';
+  const aria = String(info.detail || '').split('\n').join('. ');
+  let seats = '', people = '';
+  if (st) {
+    const need = Math.max(1, Math.min(8, st.need));
+    const holders = mine ? 0 : Math.min(need, info.holders || 0);
+    let sl = '';
+    for (let i = 0; i < need; i++) sl += `<i class="ws${mine && i === 0 ? ' me' : i < holders ? ' oth' : ''}">${mine && i === 0 ? '나' : (!mine && i < holders ? '다른 팀원' : '')}</i>`;
+    seats = `<div class="wv-row"><span class="wv-k">자리 <b>${st.need}</b>개</span><span class="wv-slots">${sl}</span></div>`;
+    if (!mine && st.w + st.o + st.a >= 3) { // 못 맡았을 때: 같은 선택을 한 사람들이 자리를 두고 겨룬 그림 (팀원이 적으면 숫자로 짐작되니 숨김)
+      const k = (pc === 'want' ? st.w : pc === 'ok' ? st.o : st.a) + 1;
+      const ic = Array.from({ length: Math.min(k, 10) }, (_, i) => personIcon(`pf-${pc}${i === 0 ? ' me' : ''}`)).join('');
+      const lab = pc === 'want' ? '하고 싶어요' : pc === 'ok' ? '상관없어요' : '피하고 싶어요';
+      seats = `<div class="wv-fight"><div class="wv-side"><span class="tg pf-${pc}">${lab}</span><span class="wv-ppl">${ic}<b>${k}명</b></span></div><span class="wv-arrow" aria-hidden="true">→</span><div class="wv-side"><span class="wv-k">자리 <b>${st.need}</b>개</span><span class="wv-slots">${sl}</span></div></div>`;
+    }
+  }
+  const lit = new Set(steps);
+  const stepper = steps.length ? `<p class="wv-sub">정해진 단계</p><ol class="wv-steps">${WHY_STEP_LABEL.map((t, i) => `<li class="${lit.has(i + 1) ? 'on' : ''}"><i>${i + 1}</i><span>${t}</span></li>`).join('')}</ol>` : '';
+  if (!seats && !stepper) return '';
+  return `<div class="why-vis" role="img" aria-label="${esc(aria)}">${seats}${people}${stepper}</div>`;
 }
 function whyItemsHtml(lines) {
   const out = [];
@@ -1322,7 +1353,7 @@ function whyItemsHtml(lines) {
     if (!groups.has(key)) { const g = { names: [], pc, label: m[2], info, unmet: !!info.unmet }; groups.set(key, g); out.push(g); }
     groups.get(key).names.push(m[1]);
   }
-  const rows = out.map((o) => (typeof o === 'string' ? o : `<li class="${o.unmet ? 'why-no' : 'why-yes'}"><div class="why-h"><b>${esc(o.names.join(' · '))}</b><span class="why-flow"><small>내 선택</small><span class="tg pf-${o.pc}">${esc(o.label)}</span></span></div><p class="why-one">${esc(o.info.short)}</p>${o.info.tag ? `<p class="why-tags"><span class="why-tag">${esc(o.info.tag)}</span></p>` : ''}${FUN ? statBarHtml(o.info.stat, o.pc) : statChipsHtml(o.info.stat)}<details class="why-more"><summary>자세히 보기</summary><ul class="why-bul">${String(o.info.detail).split('\n').map((t) => `<li>${esc(t)}</li>`).join('')}</ul></details></li>`));
+  const rows = out.map((o) => (typeof o === 'string' ? o : `<li class="${o.unmet ? 'why-no' : 'why-yes'}"><div class="why-h"><b>${esc(o.names.join(' · '))}</b><span class="why-flow"><small>내 선택</small><span class="tg pf-${o.pc}">${esc(o.label)}</span></span></div><p class="why-one">${esc(o.info.short)}</p>${o.info.tag ? `<p class="why-tags"><span class="why-tag">${esc(o.info.tag)}</span></p>` : ''}${statBarHtml(o.info.stat, o.pc)}<details class="why-more"><summary>자세히 보기</summary>${whyVisualHtml(o.info, o.pc, !o.unmet) || `<ul class="why-bul">${String(o.info.detail).split('\n').map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`}</details></li>`));
   const load = rows.filter((r) => r.includes('why-load'));
   const rest = rows.filter((r) => !r.includes('why-load'));
   // 맡은 역할 먼저(진하게), 못 맡은 역할은 뒤에(연하게), 일의 양은 맨 끝
@@ -1492,7 +1523,7 @@ function renderMine() {
     </section>
     ${
       S.priv
-        ? `<section class="card why"><h2>내 선택은 이렇게 반영됐어요 <span class="badge">나에게만 보여요</span></h2><ul class="why-list">${whyItemsHtml(S.priv.lines || [])}</ul><p class="muted small why-basis">이번 배정에서 고려한 것: 팀원들의 선호 · 피하고 싶은 역할 · 일의 양 균형</p></section>`
+        ? `<section class="card why"><h2>내 선택은 이렇게 반영됐어요 <span class="badge">나에게만 보여요</span></h2><ul class="why-list">${whyItemsHtml(S.priv.lines || [])}</ul><div class="why-basis"><span class="wbs-t">이번 배정에서 고려한 것</span><span class="wbs-c">팀원들의 선호</span><span class="wbs-c">피하고 싶은 역할</span><span class="wbs-c">일의 양 균형</span></div></section>`
         : ''
     }
     ${duties.length ? `<button type="button" class="btn big" id="go-card">내 역할 카드 보기</button>` : ''}

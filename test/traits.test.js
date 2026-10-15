@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { roleKind, suggestPrefs, relevantTraits } from '../lib/traits.js';
+import { roleKind, suggestPrefs, relevantTraits, TRAITS } from '../lib/traits.js';
 import { assignRoles, explainForPerson, PREF } from '../lib/assign.js';
 
 const roles = [
@@ -74,5 +74,12 @@ test('방에 있는 역할과 연결되는 칩만 보여 준다', () => {
   const ids = relevantTraits(two).map((t) => t.id);
   assert.deepEqual(ids, ['shy', 'nervous', 'stage', 'lead', 'follow']);
   assert.deepEqual(relevantTraits([{ id: 'g', name: '간식 담당' }]), []);
-  assert.equal(relevantTraits(roles).length, 10);
+  assert.equal(relevantTraits(roles).length, 13);
+});
+
+test('기타를 뺀 모든 역할 종류에 하고 싶은 쪽 칩과 부담되는 쪽 칩이 각각 하나 이상 있다', () => {
+  for (const k of ['lead', 'present', 'research', 'design', 'doc', 'scribe', 'schedule']) {
+    assert.ok(TRAITS.some((t) => t.effects[k] === 'want'), `${k} want`);
+    assert.ok(TRAITS.some((t) => t.effects[k] === 'avoid'), `${k} avoid`);
+  }
 });

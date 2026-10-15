@@ -51,8 +51,9 @@ test('설명: 못 맡은 "하고 싶다"는 하기 싫다 최소화 규칙으로
   assert.deepEqual(r.byPerson.jeong, ['pres']);
   const msg = explainForPerson(r, ctx, 'min').join('\n');
   assert.match(msg, /발표 · 하고 싶어요 — 이번에는 맡지 못했어요/);
-  assert.match(msg, /2순위\("모두 역할 1개 이상"\)/);
-  assert.match(msg, /"피하고 싶어요" 배정 증가/);
+  // 팀원이 적으면 규칙 조합이 곧 다른 팀원의 선택이므로, 개인 선택이 드러나는 설명을 쓰지 않는다
+  assert.match(msg, /팀 전체 규칙을 적용한 결과/);
+  assert.doesNotMatch(msg, /2순위|피하고 싶어요" 배정|나를 포함해|다른 팀원 \d명/);
   const jeongMsg = explainForPerson(r, ctx, 'jeong').join('\n');
   assert.doesNotMatch(jeongMsg, /다른 사람들의 선호를 먼저 반영/);
   // 설명에 다른 사람의 이름이나 선택을 직접 쓰지 않는다

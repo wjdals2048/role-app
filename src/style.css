@@ -1147,3 +1147,12 @@ input.dashed { border-radius: 999px; box-shadow: none; border: 2px dashed #B9BFE
 .pf-or::before, .pf-or::after { content: ''; flex: 1; height: 1px; background: #E3E6F8; }
 .pf-ask .qz-q { border-top: 0; padding: 6px 0; }
 .pf-ask .qz-q + .qz-q { margin-top: 8px; }
+
+/* 제안 박스: 제안된 선호 버튼과 같은 색 */
+.pf-hint.want { background: #BDEFDD; }
+.pf-hint.ok { background: #E9EBF5; }
+.pf-hint.avoid { background: #FFD3CB; color: #7A3A31; }
+/* 도움말을 펼치면 부담/보람 안내는 숨김 */
+.pf-help[open] ~ .pf-info .pi-rows { display: none; }
+
+.why-vis .wv-cap { margin: 10px 0 0; font-size: 13px; color: #6B7194; text-align: center; }

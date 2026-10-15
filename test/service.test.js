@@ -147,7 +147,7 @@ test('KIND_MBTI: 기타를 뺀 모든 역할 종류에 참고용 MBTI가 있다'
   for (const v of Object.values(KIND_MBTI)) for (const m of v) assert.match(m, /^[EI][NS][TF][JP]$/);
 });
 
-test('KIND_FEEL: 기타를 뺀 모든 역할 종류에 부담/뿌듯 문구가 있다', async () => {
+test('KIND_FEEL: 기타를 뺀 모든 역할 종류에 부담/보람 문구가 있다', async () => {
   const { KINDS, KIND_FEEL } = await import('../lib/roleGuide.js');
   for (const k of KINDS.filter((x) => x.id !== 'other')) { assert.ok(KIND_FEEL[k.id]?.hard && KIND_FEEL[k.id]?.good, k.id); }
 });

@@ -630,7 +630,7 @@ function syncAddLock(el) {
   b.disabled = lock || S.rolesDraft.length >= 12;
   el.querySelectorAll('.r-del').forEach((x) => { x.disabled = lock; });
   const note = el.querySelector('#r-lock');
-  if (lock && !note) b.insertAdjacentHTML('afterend', '<p class="muted small" id="r-lock" style="margin-top:8px">이미 선호를 낸 팀원이 있어서 역할을 추가하거나 삭제할 수 없어요. 인원은 고칠 수 있어요.</p>');
+  if (lock && !note) b.insertAdjacentHTML('afterend', '<div class="muted small" id="r-lock" style="margin-top:8px"><p style="margin:0">이미 선호를 낸 팀원이 있어서 역할을 추가하거나 삭제할 수 없어요.</p><p style="margin:6px 0 0">인원은 고칠 수 있어요.</p></div>');
   else if (!lock && note) note.remove();
 }
 
@@ -669,8 +669,7 @@ function drawRolesEditor(el) {
         .join('')}
       <button type="button" class="btn big line" id="r-add" ${d.length >= 12 ? 'disabled' : ''}>+ 역할 추가</button>
     </section>
-    <button type="button" class="btn big" id="r-save" style="margin-top:16px">역할 저장</button>
-    <p class="muted small center save-note"><span>저장된 역할의 이름은 고칠 수 없어요. 바꾸려면 ✕로 삭제하고 새로 추가해 주세요.</span><span>저장하면 팀원 화면에도 바로 반영돼요.</span><span>이미 선호를 낸 팀원은 새 역할을 "상관없어요"로 처리해요.</span></p>`;
+    <button type="button" class="btn big" id="r-save" style="margin-top:16px">역할 저장</button>`;
 }
 
 /** 편집 칸에 보일 글: 직접 쓰고 있던 글이 있으면 그대로, 없으면 저장된 값 */
@@ -982,7 +981,7 @@ function askBoxHtml(r, kind, flat = false) {
   }).join('');
   const sug = S.qa.sug?.[r.id];
   // 답했다면 제안을 항상 보여 준다(칩 제안이 선택을 바꿔도 사라지지 않게). 답이 없을 때만 "제안하지 않아요"
-  const note = answered && sug ? `<p class="pf-hint">질문 기준 제안: ${esc(AI_PREF_KO[sug.pref])} · ${esc(sug.why)}<small> (참고용)</small></p>` : answered ? '<p class="muted small">답한 내용으로는 제안하기 어려워요. 직접 골라 주세요.</p>' : '<p class="muted small">답하지 않으면 제안하지 않아요. 직접 골라도 돼요.</p>';
+  const note = answered && sug ? `<p class="pf-hint ${esc(sug.pref)}">질문 기준 제안: ${esc(AI_PREF_KO[sug.pref])} · ${esc(sug.why)}<small> (참고용)</small></p>` : answered ? '<p class="muted small">답한 내용으로는 제안하기 어려워요. 직접 골라 주세요.</p>' : '<p class="muted small">답하지 않으면 제안하지 않아요. 직접 골라도 돼요.</p>';
   if (flat) return `<div class="pf-ask flat"><p class="pf-sub">질문 3개에 답해 보세요</p>${body}${note}</div>`;
   return `<details class="pf-ask"${answered ? ' open' : ''}><summary>질문 3개로 제안 받기</summary>${body}${note}</details>`;
 }
@@ -997,7 +996,7 @@ function prefsCardHtml(roles) {
   const chips = chipsOf(r);
   const hint = traitHint(r.id, sug);
   const helpOpen = S.helpOpen || chips.some((t) => S.traits.has(t.id)) || (S.qa && [0, 1, 2].some((n) => S.qa.ans[`${r.id}:${n}`]));
-  const helpHtml = () => `<details class="pf-help"${helpOpen ? ' open' : ''}><summary>선택이 어렵다면</summary><p class="pf-intro">둘 중 하나만 골라 주세요. 다른 쪽을 누르면 앞의 것은 꺼져요. 제안일 뿐, 선택은 직접 해요.</p>${chips.length ? `<p class="pf-sub">나와 비슷한 문장을 눌러 보세요</p><div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}${chips.length && S.qa ? '<p class="pf-or"><span>또는</span></p>' : ''}${askBoxHtml(r, kind, true)}</details>`;
+  const helpHtml = () => `<details class="pf-help"${helpOpen ? ' open' : ''}><summary>선택이 어렵다면</summary>${chips.length ? `<p class="pf-sub">나와 비슷한 문장을 눌러 보세요</p><div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}${hint ? `<p class="pf-hint ${hint.includes('피하고 싶어요') ? 'avoid' : hint.includes('하고 싶어요') ? 'want' : hint.includes('상관없어요') ? 'ok' : ''}">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}${chips.length && S.qa ? '<p class="pf-or"><span>또는</span></p>' : ''}${askBoxHtml(r, kind, true)}</details>`;
   const last = i === roles.length - 1;
   return `
     <section class="pf">
@@ -1012,7 +1011,7 @@ function prefsCardHtml(roles) {
           ${r.desc ? `<p class="pf-desc">${esc(r.desc)}</p>` : ''}
           <button type="button" class="pf-duty" data-act="sheet">▸ 할 일 보기</button>
           ${chips.length || S.qa ? helpHtml() : ''}
-          <div class="pf-info">${infoMetaHtml(r, roles)}${KIND_FEEL[kind] ? `<div class="pi-rows"><p class="pi-row hard"><b>부담될 수 있어요</b>${esc(KIND_FEEL[kind].hard)}</p><p class="pi-row good"><b>뿌듯할 수 있어요</b>${esc(KIND_FEEL[kind].good)}</p></div>` : ''}</div>
+          <div class="pf-info">${infoMetaHtml(r, roles)}${KIND_FEEL[kind] ? `<div class="pi-rows"><p class="pi-row hard"><b>부담될 수 있어요</b>${esc(KIND_FEEL[kind].hard)}</p><p class="pi-row good"><b>보람찰 수 있어요</b>${esc(KIND_FEEL[kind].good)}</p></div>` : ''}</div>
         </div>
       </div>
       <div class="pf-opts" role="radiogroup" aria-label="${esc(r.name)} 선호">
@@ -1292,7 +1291,7 @@ function whyInfo(pf, body0, stat, rname = '') {
   if (body.includes('가장 크게 만족')) return { tag: '팀 전체 선호 반영', steps: [3], short: '하고 싶은 사람이 여럿이었지만 배정됐어요', detail: `자리 ${need}개 · 하고 싶은 사람 ${n || '여러'}명\n팀 전체의 선호를 가장 크게 만족시키는 조합을 골랐더니 내가 배정됐어요` };
   if (body.includes('같은 규칙을 적용')) {
     const why = !stat ? '' : stat.w === 0 && a === 0 ? '하고 싶다는 팀원도, 피하고 싶다는 팀원도 없었어요\n' : stat.w === 0 ? `하고 싶다는 팀원은 없고 피하고 싶다는 팀원이 ${a}명이었어요\n` : `하고 싶다는 팀원 ${stat.w}명은 다른 역할을 맡는 쪽이 팀 전체에 더 좋았어요\n`;
-    return { tag: '팀 전체 규칙', steps: [], short: stat && stat.w === 0 ? (pf === 'ok' ? `‘${rname}’ 역할을 특별히 선호한 팀원이 없어, ‘상관없어요’라고 답한 팀원 중에서 배정했어요` : `‘${rname}’ 역할을 특별히 선호한 팀원이 없어서 배정했어요`) : '팀 전체 규칙에 따라 배정했어요', detail: why + '규칙 순서: 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화' };
+    return { tag: '팀 전체 규칙', steps: [1, 2, 3], short: stat && stat.w === 0 ? (pf === 'ok' ? `‘${rname}’ 역할을 특별히 선호한 팀원이 없어, ‘상관없어요’라고 답한 팀원 중에서 배정했어요` : `‘${rname}’ 역할을 특별히 선호한 팀원이 없어서 배정했어요`) : '팀 전체 규칙에 따라 배정했어요', detail: why + '규칙 순서: 피하고 싶은 배정 최소화 → 모두 역할 1개 이상 → 하고 싶은 배정 최대화' };
   }
   return null;
 }
@@ -1312,7 +1311,7 @@ function statBarHtml(stat, pc) {
     <div class="wb-legend">${lg('want', '하고 싶어요')}${lg('ok', '상관없어요')}${lg('avoid', '피하고 싶어요')}</div></div>`;
 }
 /** 배정 이유 "자세히 보기": 글 대신 그림으로. 자리 수 · 팀원들의 응답(사람 아이콘) · 결정된 단계 */
-const WHY_STEP_LABEL = ['피하고 싶어요 줄이기', '모두 1개 이상', '하고 싶어요 늘리기', '일의 양 균형', '무작위'];
+const WHY_STEP_LABEL = ['피하고 싶어요', '모두 1개씩', '하고 싶어요', '일의 양', '무작위'];
 const personIcon = (cls = '') => `<svg class="wp ${cls}" viewBox="0 0 24 40" aria-hidden="true"><circle cx="12" cy="8" r="7"/><path d="M2 40V24a10 10 0 0 1 20 0v16z"/></svg>`;
 function whyVisualHtml(info, pc, mine) {
   const st = info.stat;
@@ -1334,7 +1333,7 @@ function whyVisualHtml(info, pc, mine) {
     }
   }
   const lit = new Set(steps);
-  const stepper = steps.length ? `<p class="wv-sub">정해진 단계</p><ol class="wv-steps">${WHY_STEP_LABEL.map((t, i) => `<li class="${lit.has(i + 1) ? 'on' : ''}"><i>${i + 1}</i><span>${t}</span></li>`).join('')}</ol>` : '';
+  const stepper = steps.length ? `<p class="wv-sub">이 순서로 따져 봤어요</p><ol class="wv-steps">${WHY_STEP_LABEL.map((t, i) => `<li class="${lit.has(i + 1) ? 'on' : ''}"><i>${i + 1}</i><span>${t}</span></li>`).join('')}</ol><p class="wv-cap">노란 불이 켜진 규칙으로 정해졌어요.</p>` : '';
   if (!seats && !stepper) return '';
   return `<div class="why-vis" role="img" aria-label="${esc(aria)}">${seats}${people}${stepper}</div>`;
 }

@@ -83,7 +83,7 @@ test('이름만 바뀌고 예전 종류가 남은 역할: 이름의 종류를 �
   assert.equal(kindOfRole({ name: '간식 담당', kind: 'lead' }), 'lead'); // 한계: 이름에 단서가 없으면 구분할 수 없다
 });
 
-test('모든 역할 종류(기타 제외)에 설명·할 일·부담/뿌듯·칩·질문이 모두 있다', async () => {
+test('모든 역할 종류(기타 제외)에 설명·할 일·부담/보람·칩·질문이 모두 있다', async () => {
   const { KINDS, GUIDE_TEMPLATES, KIND_FEEL } = await import('../lib/roleGuide.js');
   const { TRAITS } = await import('../lib/traits.js');
   const { QUIZ } = await import('../lib/quiz.js');

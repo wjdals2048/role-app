@@ -16,7 +16,7 @@ test('답 → 선호 제안 규칙', () => {
   assert.equal(s({ burden: 'y', reward: 'n', exp: 'y' }).pref, 'avoid');
   assert.equal(s({ reward: 'y', burden: 'n' }).pref, 'want');
   assert.equal(s({ reward: 'y' }).pref, 'want');
-  assert.equal(s({ burden: 'y', reward: 'y', exp: 'y' }).pref, 'want');
+  assert.equal(s({ burden: 'y', reward: 'y', exp: 'y' }).pref, 'ok'); // 부담이 있으면 경험이 있어도 '하고 싶어요'로 제안하지 않는다
   assert.equal(s({ burden: 'y', reward: 'y', exp: 'n' }).pref, 'ok');
   assert.equal(s({ burden: 'n', reward: 'n', exp: 'y' }).pref, 'ok');
   assert.equal(s({ burden: 'n', reward: 'n', exp: 'n' }).pref, 'ok');

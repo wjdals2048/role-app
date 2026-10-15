@@ -213,7 +213,7 @@ function renderStart() {
         <button type="button" class="start-card" id="go-create"><span class="sc-ic mata"><img src="/mata-s.png" alt="" /></span>방 만들기</button>
         <button type="button" class="start-card" id="go-join"><span class="sc-ic taba"><img src="/taba-s.png" alt="" /></span>방 참여하기</button>
       </div>
-      ${store?.mode !== 'demo' ? '<button type="button" class="solo-card" id="go-practice"><b>혼자 체험해 보기</b><small>팀원 없이 방 만들기부터 배정까지 연습해 봐요. 내용은 이 브라우저 안에만 남아요</small></button>' : ''}
+      ${store?.mode !== 'demo' ? '<button type="button" class="solo-card" id="go-practice"><b>혼자 체험해 보기</b><small>팀원 없이 방 만들기부터 배정까지 연습해 봐요.<br>내용은 이 브라우저 안에만 남아요</small></button>' : ''}
       ${store?.mode === 'demo' ? '<button type="button" class="solo-card" id="go-solo"><b>혼자 체험하기</b><small>가상 팀원 3명이 미리 선호를 냈어요. 나는 방장이 돼요</small></button>' : ''}
       ${recentRooms().length ? `<section class="recent" aria-label="최근 들어간 방"><h2>최근 들어간 방</h2>${recentRooms().slice(0, 3).map((r) => `<div class="recent-row"><button type="button" class="recent-go" data-code="${esc(r.code)}"><b>${esc(r.name || '이름 없는 방')}</b><small>${esc(r.code)}</small></button><button type="button" class="x recent-del" data-code="${esc(r.code)}" aria-label="${esc(r.name || r.code)} 목록에서 지우기">✕</button></div>`).join('')}</section>` : ''}
       <button type="button" class="about-link" id="go-about">마타·타바는 누구예요?</button>

@@ -818,6 +818,14 @@ function funPrefSay(r, f) {
 
 /** 실험(?fun): 역할 종류별 질문(부담·보람·경험)에 답하면 선호를 "제안"한다. 점수는 만들지 않고, 배정 계산에도 쓰지 않는다. */
 const AI_PREF_KO = { want: '하고 싶어요', ok: '상관없어요', avoid: '피하고 싶어요' };
+/** 카드에 보이는 성향 칩(역할마다 최대 2개: 하고 싶은 쪽 1개 + 부담되는 쪽 1개) */
+function chipsOf(r) {
+  const kind = kindOfRole(r);
+  const all = relevantTraits([r]).filter((t) => kind && t.effects[kind]);
+  const wantChip = all.find((t) => t.effects[kind] === 'want');
+  const avoidChip = all.find((t) => t.id === 'nervous') || all.find((t) => t.effects[kind] === 'avoid');
+  return [wantChip, avoidChip].filter(Boolean);
+}
 /** 한 역할의 답이 바뀔 때마다 그 역할의 제안을 다시 계산해 입력값에 반영한다(배정에는 일반 선호와 똑같이 쓰인다). */
 function quizLive(rid) {
   const r = S.room.roles.find((x) => x.id === rid);
@@ -972,7 +980,9 @@ function askBoxHtml(r, kind, flat = false) {
     const key = `${r.id}:${n}`; const v = S.qa.ans[key];
     return `<div class="qz-q"><p>${esc(q.q)}</p><div class="qz-btns">${ANSWERS[q.t].map(([a, l]) => `<button type="button" data-q="${esc(key)}" data-a="${a}" aria-pressed="${v === a}" class="${v === a ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
   }).join('');
-  const note = qaNoteHtml(r, 0) || '<p class="muted small">답하지 않으면 제안하지 않아요. 직접 골라도 돼요.</p>';
+  const sug = S.qa.sug?.[r.id];
+  // 답했다면 제안을 항상 보여 준다(칩 제안이 선택을 바꿔도 사라지지 않게). 답이 없을 때만 "제안하지 않아요"
+  const note = answered && sug ? `<p class="pf-hint">질문 기준 제안: ${esc(AI_PREF_KO[sug.pref])} · ${esc(sug.why)}<small> (참고용)</small></p>` : answered ? '<p class="muted small">답한 내용으로는 제안하기 어려워요. 직접 골라 주세요.</p>' : '<p class="muted small">답하지 않으면 제안하지 않아요. 직접 골라도 돼요.</p>';
   if (flat) return `<div class="pf-ask flat"><p class="pf-sub">질문 3개에 답해 보세요</p>${body}${note}</div>`;
   return `<details class="pf-ask"${answered ? ' open' : ''}><summary>질문 3개로 제안 받기</summary>${body}${note}</details>`;
 }
@@ -984,14 +994,10 @@ function prefsCardHtml(roles) {
   const total = roles.length + 1;
   const sug = suggestPrefs([...S.traits], roles);
   const kind = kindOfRole(r);
-  // 성향 칩은 역할마다 최대 2개: 하고 싶은 쪽 1개 + 부담되는 쪽 1개
-  const all = relevantTraits([r]).filter((t) => kind && t.effects[kind]);
-  const wantChip = all.find((t) => t.effects[kind] === 'want');
-  const avoidChip = all.find((t) => t.id === 'nervous') || all.find((t) => t.effects[kind] === 'avoid');
-  const chips = [wantChip, avoidChip].filter(Boolean);
+  const chips = chipsOf(r);
   const hint = traitHint(r.id, sug);
   const helpOpen = S.helpOpen || chips.some((t) => S.traits.has(t.id)) || (S.qa && [0, 1, 2].some((n) => S.qa.ans[`${r.id}:${n}`]));
-  const helpHtml = () => `<details class="pf-help"${helpOpen ? ' open' : ''}><summary>선택이 어렵다면</summary><p class="pf-intro">둘 중 하나만 해도 돼요. 제안일 뿐, 선택은 직접 해요.</p>${chips.length ? `<p class="pf-sub">나와 비슷한 문장을 눌러 보세요</p><div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}${chips.length && S.qa ? '<p class="pf-or"><span>또는</span></p>' : ''}${askBoxHtml(r, kind, true)}</details>`;
+  const helpHtml = () => `<details class="pf-help"${helpOpen ? ' open' : ''}><summary>선택이 어렵다면</summary><p class="pf-intro">둘 중 하나만 골라 주세요. 다른 쪽을 누르면 앞의 것은 꺼져요. 제안일 뿐, 선택은 직접 해요.</p>${chips.length ? `<p class="pf-sub">나와 비슷한 문장을 눌러 보세요</p><div class="chips pf-chips">${chips.map((t) => `<button type="button" class="chip trait" data-trait="${esc(t.id)}" aria-pressed="${S.traits.has(t.id)}">${esc(t.label)}</button>`).join('')}</div>` : ''}${hint ? `<p class="pf-hint">${esc(hint)}</p>` : !chips.length ? '<p class="pf-hint plain">제안이 없어요. 직접 골라 주세요</p>' : ''}${chips.length && S.qa ? '<p class="pf-or"><span>또는</span></p>' : ''}${askBoxHtml(r, kind, true)}</details>`;
   const last = i === roles.length - 1;
   return `
     <section class="pf">
@@ -1794,8 +1800,17 @@ function attachDelegates() {
     const qb = e.target.closest('[data-q]');
     if (qb && S.qa) {
       const [k, v] = [qb.dataset.q, qb.dataset.a];
+      const rid0 = k.slice(0, k.lastIndexOf(':'));
+      // 칩과 질문은 둘 중 하나만: 질문에 답하기 시작하면 이 역할의 칩은 꺼진다
+      const rr0 = S.room.roles.find((x) => x.id === rid0);
+      const onChips = rr0 ? chipsOf(rr0).filter((t) => S.traits.has(t.id)) : [];
+      if (onChips.length) {
+        onChips.forEach((t) => S.traits.delete(t.id));
+        const sg = suggestPrefs([...S.traits], S.room.roles);
+        for (const x of S.room.roles) if (x.id !== rid0 && !S.touched.has(x.id)) S.form.prefs[x.id] = sg.suggestions[x.id]?.value || 'ok';
+      }
       if (S.qa.ans[k] === v) delete S.qa.ans[k]; else S.qa.ans[k] = v;
-      quizLive(k.slice(0, k.lastIndexOf(':')));
+      quizLive(rid0);
       renderPrefs(); return;
     }
     const stb = e.target.closest('[data-st]');
@@ -1824,8 +1839,15 @@ function attachDelegates() {
       // 칩을 누르는 것도 본인의 선택이다: 이 칩이 가리키는 역할은 이전 선택(직접 고른 것, 질문 제안)보다 칩이 우선한다
       const eff = TRAITS.find((t) => t.id === id)?.effects || {};
       for (const r of S.room.roles) if (eff[kindOfRole(r)]) S.touched.delete(r.id);
+      // 칩과 질문은 둘 중 하나만: 칩을 누르면 이 역할에 답해 둔 질문은 지워진다
+      const cur = S.room.roles[S.pIdx];
+      if (cur && S.qa) { for (const key of Object.keys(S.qa.ans)) if (key.startsWith(cur.id + ':')) delete S.qa.ans[key]; delete S.qa.sug[cur.id]; }
       if (S.traits.has(id)) S.traits.delete(id);
-      else S.traits.add(id);
+      else {
+        // 카드의 칩 두 개는 동시에 눌리지 않는다: 하나를 누르면 다른 하나는 꺼진다
+        if (cur) chipsOf(cur).forEach((t) => { if (t.id !== id) S.traits.delete(t.id); });
+        S.traits.add(id);
+      }
       applyTraits();
       playAnim(`.chip.trait[data-trait="${id}"][aria-pressed="true"]`, 'pop', 450);
       return;

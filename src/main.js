@@ -151,7 +151,7 @@ const SOLO_BOTS = [
   { nickname: '민수', avatar: 'T_wink', want: ['발표'], avoid: ['PPT·디자인'] },
   { nickname: '채연', avatar: 'M_think', want: ['PPT·디자인'], avoid: ['팀장'] },
 ];
-async function startSolo() {
+async function startSolo(nick, avatar) {
   const roles = normalizeRoles(['팀장', '발표', '자료 조사', 'PPT·디자인'].map((nm, i) => ({
     id: `r${i + 1}`, name: nm, need: 1, load: TEMPLATES.find((t) => t.name === nm).load, kind: kindFromName(nm) || '', desc: '', tasks: [],
   })));
@@ -160,8 +160,39 @@ async function startSolo() {
     nickname: b.nickname, avatar: b.avatar, message: b.message,
     prefs: Object.fromEntries([...b.want.map((n) => [idOf(n), 'want']), ...b.avoid.map((n) => [idOf(n), 'avoid'])]),
   }));
-  const code = await store.createSoloRoom({ roles, nickname: savedNick() || '방장', name: '체험용 팀플', avatar: savedAvatar() || 'M_base', bots });
+  const code = await store.createSoloRoom({ roles, nickname: nick || '방문객', name: '체험용 팀플', avatar: avatar || 'M_base', bots });
   location.hash = `#/room/${code}`;
+}
+
+/** 혼자 체험하기 시작 전 이름 입력. 이 브라우저에 저장된 닉네임·캐릭터는 쓰지 않는다(부스에서 방문객이 체험하는 기기라서). */
+function renderSoloSetup() {
+  cleanup();
+  draftAv = Math.random() < 0.5 ? 'M_base' : 'T_base';
+  $app.innerHTML = `
+    <div class="back-row"><button type="button" class="link back-chev" id="back" aria-label="뒤로 가기">‹</button>${modeBadge()}</div>
+    <section class="create stack" aria-labelledby="h-solo">
+      <div class="create-head"><h1 id="h-solo" class="page-title">혼자 체험하기</h1><img class="create-mata" src="/mata.png" alt="" width="78" height="82" /></div>
+      <p class="muted">가상 팀원 3명(지은·민수·채연)이 미리 선호를 냈어요. 내가 방장이 되어 입력하고 배정 결과를 볼 수 있어요. 내용은 이 브라우저 안에만 남아요.</p>
+      <div>
+        <label for="solo-nick">내 닉네임 <span class="tag req">필수</span></label>
+        <div class="nick-row"><button type="button" class="av-btn" data-av-toggle="draft" aria-label="프로필 캐릭터 고르기">${avatarHtml(draftAv)}<i class="av-edit" aria-hidden="true">✎</i></button><input id="solo-nick" type="text" maxlength="12" placeholder="예: 홍길동" value="" autocomplete="off" /></div>
+        <div class="avp-wrap" id="avp-draft" hidden>${avatarPickerHtml(draftAv, 'draft')}</div>
+      </div>
+      <button type="button" class="btn" id="solo-go">체험 시작하기</button>
+    </section>`;
+  $app.querySelector('#back').addEventListener('click', () => (location.hash = '#/'));
+  const $n = $app.querySelector('#solo-nick');
+  const go = $app.querySelector('#solo-go');
+  const start = async () => {
+    const nick = $n.value.replace(/\s+/g, ' ').trim().slice(0, 12);
+    if (!nick) { toast('닉네임을 입력해 주세요.'); $n.focus(); return; }
+    if (SOLO_BOTS.some((b) => b.nickname === nick)) { toast('가상 팀원과 같은 이름이에요. 다른 이름을 입력해 주세요.'); return; }
+    go.disabled = true;
+    try { await startSolo(nick, draftAv); } catch (err) { console.error(err); toast('체험 방을 만들지 못했어요'); go.disabled = false; }
+  };
+  go.addEventListener('click', start);
+  $n.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); start(); } });
+  $n.focus();
 }
 
 function renderStart() {
@@ -193,7 +224,7 @@ function renderStart() {
   $app.querySelector('#go-create').addEventListener('click', () => (location.hash = '#/create'));
   $app.querySelector('#go-join').addEventListener('click', () => (location.hash = '#/join'));
   $app.querySelector('#go-practice')?.addEventListener('click', () => { location.href = `${location.pathname}?demo`; });
-  $app.querySelector('#go-solo')?.addEventListener('click', (e) => { e.currentTarget.disabled = true; startSolo().catch((err) => { console.error(err); toast('체험 방을 만들지 못했어요'); e.currentTarget.disabled = false; }); });
+  $app.querySelector('#go-solo')?.addEventListener('click', () => renderSoloSetup());
 }
 
 
@@ -2132,7 +2163,7 @@ async function boot() {
   bindAvatarClicks();
   window.addEventListener('hashchange', route);
   if (new URLSearchParams(location.search).has('solo') && store.mode === 'demo' && !location.hash.startsWith('#/room')) {
-    try { await startSolo(); return; } catch (e) { console.error(e); }
+    renderSoloSetup(); return;
   }
   route();
 }
